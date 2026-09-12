@@ -20,6 +20,8 @@ RUNTIME_ITEMS = [
     'extension',
     'icons',
     'install.sh',
+    'install-latest.sh',
+    'install-online.sh',
     'uninstall.sh',
     'README.md',
     'VERSION',
@@ -89,7 +91,9 @@ def validate_project(project_root):
     bash = shutil.which('bash')
     if bash:
         for path in [project_root / 'install.sh', project_root / 'uninstall.sh',
-                     project_root / 'app' / 'zorin-shot-first-login.sh']:
+                     project_root / 'app' / 'zorin-shot-first-login.sh',
+                     project_root / 'install-latest.sh',
+                     project_root / 'install-online.sh']:
             run([bash, '-n', str(path)], cwd=project_root)
 
     desktop_validate = shutil.which('desktop-file-validate')

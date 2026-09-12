@@ -2,6 +2,25 @@
 
 All notable Zorin Shot changes are documented here. The section matching a release tag is automatically used as the GitHub Release description and is displayed in the application's **Updates** tab.
 
+## [0.3.12] - 2026-09-12
+
+### Changed
+- Added `install-latest.sh` as the canonical one-command installer.
+- README now installs the latest published release with `curl -fsSL https://raw.githubusercontent.com/ILoveMyProjects/ZorinShot/master/install-latest.sh | bash`.
+- `install-latest.sh` is included in release ZIPs and validated by the release builder.
+- Kept `install-online.sh` for backwards compatibility with older links.
+
+## [0.3.11] - 2026-09-12
+
+### Added
+- Added `install-online.sh`, a one-command online installer for GitHub users.
+- README now provides a primary quick-install command that automatically downloads the latest stable release.
+- The online installer reads `update.json`, verifies the release SHA-256 checksum, safely extracts the ZIP, and runs `install.sh`.
+
+### Changed
+- Manual ZIP download is now documented only as a fallback installation method.
+- Release packages now include `install-online.sh`.
+
 ## [0.3.10] - 2026-09-12
 
 ### Added

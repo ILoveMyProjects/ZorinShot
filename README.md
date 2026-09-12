@@ -16,12 +16,27 @@ Zorin Shot is a screenshot tool for **Zorin OS 18 / GNOME Shell 46**. It consist
 
 ## Installation
 
-1. Download `zorin-shot-X.Y.Z.zip` from GitHub Releases.
-2. Extract the archive.
-3. Run `install.sh`.
-4. Log out and sign back in so GNOME Shell can load the extension.
+### Quick install
 
-A fresh installation enables the extension for the next login and opens the Zorin Shot settings application once after signing back in. No additional `gnome-extensions enable` or `gnome-extensions prefs` command is required.
+Install the latest published release with one command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ILoveMyProjects/ZorinShot/master/install-latest.sh | bash
+```
+
+The installer automatically:
+
+- reads the current stable `update.json`;
+- downloads the latest Zorin Shot release ZIP;
+- verifies its SHA-256 checksum;
+- extracts the package safely;
+- runs the normal Zorin Shot installer.
+
+After installation, log out and sign back in so GNOME Shell can load the extension. A fresh installation enables the extension for the next login and opens the Zorin Shot settings application once after signing back in. No additional `gnome-extensions enable` or `gnome-extensions prefs` command is required.
+
+### Manual installation
+
+Manual download is only a fallback. Download `zorin-shot-X.Y.Z.zip` from GitHub Releases, extract it, and run `install.sh`.
 
 ## Screenshot workflow
 
@@ -61,7 +76,7 @@ When a newer version is available, **Zorin Shot → Updates → Download and ins
 
 The workflow is stored in `.github/workflows/build-release.yml`.
 
-A regular push to `master` or `main` validates and builds the project. A version tag such as `v0.3.10` additionally:
+A regular push to `master` or `main` validates and builds the project. A version tag such as `v0.3.11` additionally:
 
 1. verifies that the tag matches `VERSION`;
 2. builds `zorin-shot-X.Y.Z.zip`;
@@ -84,8 +99,8 @@ The repository needs **Actions → Workflow permissions → Read and write permi
 4. Create and push the matching tag, for example:
 
 ```bash
-git tag v0.3.10
-git push origin v0.3.10
+git tag v0.3.11
+git push origin v0.3.11
 ```
 
 GitHub Actions handles the remaining release steps.
@@ -106,6 +121,7 @@ This uses the same release builder as GitHub Actions and creates the ZIP, checks
 - `app/zorin-shot-editor.py` — annotation editor.
 - `app/zorin-shot-control.py` — Settings / About / Updates application.
 - `app/i18n.py` — English and Polish UI strings.
+- `install-online.sh` — one-command online installer that downloads and verifies the latest release.
 - `install.sh` — installer and update installer.
 - `uninstall.sh` — uninstaller.
 - `tools/build_release.py` — release ZIP, SHA-256 and update-manifest builder.
