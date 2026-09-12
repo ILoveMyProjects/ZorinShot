@@ -120,11 +120,12 @@ def save_editor_state(state):
 
 
 class EditorWindow(Gtk.ApplicationWindow):
-    TOOL_ORDER = ['move', 'crop', 'pen', 'highlighter', 'line', 'arrow', 'rect', 'ellipse', 'text', 'number', 'redact']
+    TOOL_ORDER = ['pen', 'highlighter', 'line', 'arrow', 'rect', 'ellipse', 'text', 'number', 'redact', 'crop', 'move']
 
     def __init__(self, app, image_path, select_region=False):
         super().__init__(application=app, title='Zorin Shot')
         self.set_property('icon-name', APP_ID)
+        self.app_settings = _load_app_settings()
         self.lang = read_language()
         self.theme = read_theme()
         self.editor_state = load_editor_state()
@@ -142,7 +143,7 @@ class EditorWindow(Gtk.ApplicationWindow):
         self.zoom = 1.0
         self.auto_fit = True
         self.fit_margin = 36
-        self.tool = 'crop' if select_region else 'move'
+        self.tool = 'crop' if select_region else 'pen'
         self.annotations = []
         self.undo_stack = []
         self.redo_stack = []
@@ -190,6 +191,11 @@ class EditorWindow(Gtk.ApplicationWindow):
         self.next_number = 1
 
         self._apply_theme()
+        if self.app_settings is not None:
+            try:
+                self.app_settings.connect('changed::app-theme', self._theme_setting_changed)
+            except Exception:
+                pass
         self.connect('close-request', self._on_close_request)
         self._build_ui(select_region)
         self._fit_to_view(allow_enlarge=True)
@@ -212,22 +218,44 @@ class EditorWindow(Gtk.ApplicationWindow):
         gtk_settings = Gtk.Settings.get_default()
         if gtk_settings is not None:
             gtk_settings.set_property('gtk-application-prefer-dark-theme', dark)
+        display = Gdk.Display.get_default()
+        if getattr(self, '_theme_provider', None) is not None and display is not None:
+            try:
+                Gtk.StyleContext.remove_provider_for_display(display, self._theme_provider)
+            except Exception:
+                pass
         provider = Gtk.CssProvider()
         bg_sidebar = '#202226' if dark else '#f4f5f7'
-        bg_card = '#2a2d32' if dark else '#ffffff'
+        bg_card = '#292c31' if dark else '#ffffff'
         fg_dim = '#b7bec8' if dark else '#5f6368'
-        self.canvas_bg = (0.085, 0.095, 0.11) if dark else (0.94, 0.95, 0.97)
-        self.canvas_shadow_alpha = 0.32 if dark else 0.08
+        border = '#3b3f46' if dark else '#d8dce2'
+        self.canvas_bg = (0.065, 0.072, 0.085) if dark else (0.94, 0.95, 0.97)
+        self.canvas_shadow_alpha = 0.36 if dark else 0.08
         css = f'''
-        .sidebar {{ background: {bg_sidebar}; }}
-        .card {{ background: {bg_card}; border-radius: 12px; }}
+        .sidebar-shell, .sidebar-shell > viewport, .sidebar {{ background-color: {bg_sidebar}; }}
+        .section-card {{ background: {bg_card}; border: 1px solid {border}; border-radius: 12px; padding: 0; }}
+        .section-title {{ background-color: transparent; padding: 0 6px 5px 6px; font-weight: 700; }}
+        .section-body {{ padding: 10px; }}
+        .card {{ background: {bg_card}; border: 1px solid {border}; border-radius: 12px; }}
         .tool-button {{ padding: 3px; min-width: 36px; min-height: 36px; border-radius: 8px; }}
         .toolbar-button {{ padding: 3px; min-width: 34px; min-height: 34px; }}
         .dim-tint {{ color: {fg_dim}; }}
         .topbar {{ padding: 2px; }}
         '''
         provider.load_from_data(css.encode('utf-8'))
-        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        if display is not None:
+            Gtk.StyleContext.add_provider_for_display(display, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        self._theme_provider = provider
+
+    def _theme_setting_changed(self, settings, _key):
+        try:
+            value = settings.get_string('app-theme')
+            self.theme = value if value in ('system', 'dark', 'light') else 'system'
+        except Exception:
+            self.theme = 'system'
+        self._apply_theme()
+        if hasattr(self, 'canvas'):
+            self.canvas.queue_draw()
 
     def _display_name(self, tool):
         names = {
@@ -386,6 +414,7 @@ class EditorWindow(Gtk.ApplicationWindow):
         left.append(self.status)
 
         sidebar_scroll = Gtk.ScrolledWindow()
+        sidebar_scroll.add_css_class('sidebar-shell')
         sidebar_scroll.set_size_request(350, -1)
         sidebar_scroll.set_min_content_width(350)
         sidebar_scroll.set_hexpand(False)
@@ -394,13 +423,26 @@ class EditorWindow(Gtk.ApplicationWindow):
 
         right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         right.add_css_class('sidebar')
-        right.set_margin_top(10)
+        # Sidebar is anchored to the top of its own viewport. Do not tie its
+        # position to the vertically centered image; otherwise small screenshots
+        # push the entire Tools panel down and make it appear late/centered.
+        right.set_margin_top(0)
         right.set_margin_bottom(10)
         right.set_margin_start(10)
         right.set_margin_end(12)
         sidebar_scroll.set_child(right)
 
-        right.append(self._section_title(self._L('Narzędzia', 'Tools')))
+        # Tools: title is outside the card; only the controls are framed.
+        tools_section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        tools_section.append(self._section_title(self._L('Narzędzia', 'Tools')))
+        tools_frame = Gtk.Frame()
+        tools_frame.add_css_class('section-card')
+        tool_body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        tool_body.add_css_class('section-body')
+        tools_frame.set_child(tool_body)
+        tools_section.append(tools_frame)
+        right.append(tools_section)
+
         tool_box = Gtk.FlowBox()
         tool_box.set_min_children_per_line(6)
         tool_box.set_max_children_per_line(6)
@@ -408,7 +450,7 @@ class EditorWindow(Gtk.ApplicationWindow):
         tool_box.set_valign(Gtk.Align.START)
         tool_box.set_row_spacing(6)
         tool_box.set_column_spacing(6)
-        right.append(tool_box)
+        tool_body.append(tool_box)
 
         self.tool_buttons = {}
         group_leader = None
@@ -442,14 +484,15 @@ class EditorWindow(Gtk.ApplicationWindow):
             tool_box.insert(btn, -1)
         self.tool_buttons[self.tool].set_active(True)
 
-        right.append(self._section_title(self._L('Opcje narzędzia', 'Tool options')))
+        # Dynamic tool options: title outside the card; card height follows active content.
+        options_section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        options_section.append(self._section_title(self._L('Opcje narzędzia', 'Tool options')))
         options_frame = Gtk.Frame()
-        options_frame.add_css_class('card')
+        options_frame.add_css_class('section-card')
         options_wrap = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        options_wrap.set_margin_top(10); options_wrap.set_margin_bottom(10); options_wrap.set_margin_start(10); options_wrap.set_margin_end(10)
+        options_wrap.add_css_class('section-body')
         self.options_stack = Gtk.Stack()
-        self.options_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
-        self.options_stack.set_transition_duration(120)
+        self.options_stack.set_transition_type(Gtk.StackTransitionType.NONE)
         self.options_stack.set_hhomogeneous(False)
         self.options_stack.set_vhomogeneous(False)
         self.options_stack.set_vexpand(False)
@@ -459,18 +502,19 @@ class EditorWindow(Gtk.ApplicationWindow):
         self._build_option_pages()
         options_wrap.append(self.options_stack)
         options_frame.set_child(options_wrap)
-        right.append(options_frame)
+        options_section.append(options_frame)
+        right.append(options_section)
 
-        right.append(self._section_title(self._L('Elementy', 'Elements')))
+        # Elements: title outside; list grows naturally and then scrolls.
+        elements_section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        elements_section.append(self._section_title(self._L('Elementy', 'Elements')))
         elements_frame = Gtk.Frame()
-        elements_frame.add_css_class('card')
-        right.append(elements_frame)
+        elements_frame.add_css_class('section-card')
         elements_holder = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        elements_holder.set_margin_top(8)
-        elements_holder.set_margin_bottom(8)
-        elements_holder.set_margin_start(8)
-        elements_holder.set_margin_end(8)
+        elements_holder.add_css_class('section-body')
         elements_frame.set_child(elements_holder)
+        elements_section.append(elements_frame)
+        right.append(elements_section)
 
         elements_scroll = Gtk.ScrolledWindow()
         elements_scroll.set_min_content_height(56)
@@ -490,16 +534,16 @@ class EditorWindow(Gtk.ApplicationWindow):
         row_actions.append(self._make_icon_button('go-down-symbolic', self._L('Przesuń niżej', 'Move down'), lambda *_: self._reorder_selected(1)))
         row_actions.append(self._make_icon_button('user-trash-symbolic', self._L('Usuń zaznaczone', 'Delete selected'), lambda *_: self._delete_selected()))
 
-        right.append(self._section_title(self._L('Szczegóły obrazu', 'Image details')))
+        # Image details: title outside the card.
+        image_section = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        image_section.append(self._section_title(self._L('Szczegóły obrazu', 'Image details')))
         image_frame = Gtk.Frame()
-        image_frame.add_css_class('card')
-        right.append(image_frame)
+        image_frame.add_css_class('section-card')
         image_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        image_box.set_margin_top(10)
-        image_box.set_margin_bottom(10)
-        image_box.set_margin_start(10)
-        image_box.set_margin_end(10)
+        image_box.add_css_class('section-body')
         image_frame.set_child(image_box)
+        image_section.append(image_frame)
+        right.append(image_section)
         self.details_label = Gtk.Label(xalign=0, wrap=True)
         image_box.append(self.details_label)
 
@@ -515,6 +559,11 @@ class EditorWindow(Gtk.ApplicationWindow):
         click.connect('pressed', self._click_pressed)
         self.canvas.add_controller(click)
 
+        # Ctrl + mouse wheel zooms the image instead of scrolling the viewport.
+        zoom_scroll = Gtk.EventControllerScroll.new(Gtk.EventControllerScrollFlags.VERTICAL)
+        zoom_scroll.connect('scroll', self._on_zoom_scroll)
+        self.canvas.add_controller(zoom_scroll)
+
         keys = Gtk.EventControllerKey()
         keys.connect('key-pressed', self._key_pressed)
         self.add_controller(keys)
@@ -526,6 +575,11 @@ class EditorWindow(Gtk.ApplicationWindow):
     def _section_title(self, text):
         label = Gtk.Label(label=text, xalign=0)
         label.add_css_class('heading')
+        label.add_css_class('section-title')
+        label.set_margin_start(2)
+        label.set_margin_end(2)
+        label.set_margin_top(0)
+        label.set_margin_bottom(4)
         return label
 
     def _build_option_pages(self):
@@ -672,14 +726,27 @@ class EditorWindow(Gtk.ApplicationWindow):
         self.canvas.queue_draw()
 
     def _viewport_changed(self, *_args):
-        self.viewport_w = max(1, self.scroll.get_width())
-        self.viewport_h = max(1, self.scroll.get_height())
+        width = self.scroll.get_width()
+        height = self.scroll.get_height()
+        if width > 1:
+            self.viewport_w = width
+        if height > 1:
+            self.viewport_h = height
         if self.auto_fit:
             self._fit_to_view(allow_enlarge=True)
         else:
             self.canvas.queue_draw()
 
     def _fit_to_view(self, *_args, allow_enlarge=True):
+        # Re-read the actual viewport every time Fit is clicked; cached values
+        # can be stale after resizing/maximizing a GTK window.
+        if hasattr(self, 'scroll'):
+            width = self.scroll.get_width()
+            height = self.scroll.get_height()
+            if width > 1:
+                self.viewport_w = width
+            if height > 1:
+                self.viewport_h = height
         self.auto_fit = True
         usable_w = max(100, self.viewport_w - self.fit_margin)
         usable_h = max(100, self.viewport_h - self.fit_margin)
@@ -695,6 +762,16 @@ class EditorWindow(Gtk.ApplicationWindow):
         self.zoom = clamp(self.zoom * factor, 0.05, 8.0)
         self._update_canvas_metrics()
         self.canvas.queue_draw()
+
+    def _on_zoom_scroll(self, controller, _dx, dy):
+        state = controller.get_current_event_state()
+        if not (state & Gdk.ModifierType.CONTROL_MASK):
+            return False
+        if dy < 0:
+            self._manual_zoom(1.12)
+        elif dy > 0:
+            self._manual_zoom(1 / 1.12)
+        return True
 
     def _update_canvas_metrics(self):
         target_w = max(self.viewport_w, int(self.img_w * self.zoom) + self.fit_margin)
@@ -806,6 +883,7 @@ class EditorWindow(Gtk.ApplicationWindow):
 
     def _draw_annotation(self, cr, ann):
         kind = ann['kind']
+        cr.new_path()
         cr.save()
         cr.set_line_cap(cairo.LINE_CAP_ROUND)
         cr.set_line_join(cairo.LINE_JOIN_ROUND)
@@ -859,6 +937,7 @@ class EditorWindow(Gtk.ApplicationWindow):
         elif kind == 'number':
             self._draw_number_annotation(cr, ann)
         cr.restore()
+        cr.new_path()
 
     def _draw_text_annotation(self, cr, ann):
         size = ann['size']
@@ -882,6 +961,7 @@ class EditorWindow(Gtk.ApplicationWindow):
 
     def _draw_number_annotation(self, cr, ann):
         x = ann['x']; y = ann['y']; radius = ann['radius']
+        cr.new_path()
         self._set_source(cr, ann['fill_color'], ann['fill_opacity'])
         cr.arc(x, y, radius, 0, 2 * math.pi)
         cr.fill_preserve()
@@ -895,6 +975,7 @@ class EditorWindow(Gtk.ApplicationWindow):
         self._set_source(cr, ann['text_color'])
         cr.move_to(x - (ext.width / 2 + ext.x_bearing), y - (ext.height / 2 + ext.y_bearing))
         cr.show_text(text)
+        cr.new_path()
 
     def _rounded_rect(self, cr, x, y, w, h, r):
         r = min(r, w / 2, h / 2)
@@ -1307,34 +1388,92 @@ class EditorWindow(Gtk.ApplicationWindow):
             return False
         if not self._confirm_close_enabled():
             return False
-        dialog = Gtk.Dialog(transient_for=self, modal=True, title=self._L('Zamknąć Zorin Shot?', 'Close Zorin Shot?'))
-        dialog.add_button(self._L('Anuluj', 'Cancel'), Gtk.ResponseType.CANCEL)
-        dialog.add_button(self._L('Kopiuj i zamknij', 'Copy and close'), Gtk.ResponseType.APPLY)
-        dialog.add_button(self._L('Zamknij', 'Close'), Gtk.ResponseType.CLOSE)
+
+        dialog = Gtk.Dialog(transient_for=self, modal=True)
+        dialog.set_title(self._L('Zamknąć Zorin Shot?', 'Close Zorin Shot?'))
+        dialog.set_default_size(520, -1)
+        dialog.set_resizable(False)
+
         content = dialog.get_content_area()
-        content.set_margin_top(12); content.set_margin_bottom(12); content.set_margin_start(12); content.set_margin_end(12)
-        label = Gtk.Label(label=self._L('Przed zamknięciem możesz skopiować obraz do schowka albo po prostu zamknąć okno.', 'Before closing, you can copy the image to the clipboard or just close the window.'), wrap=True, xalign=0)
-        content.append(label)
+        content.set_spacing(14)
+        content.set_margin_top(24)
+        content.set_margin_bottom(22)
+        content.set_margin_start(28)
+        content.set_margin_end(28)
+
+        icon = Gtk.Image.new_from_icon_name('dialog-question-symbolic')
+        icon.set_pixel_size(42)
+        icon.set_halign(Gtk.Align.CENTER)
+        content.append(icon)
+
+        question = Gtk.Label(
+            label=self._L('Co chcesz zrobić przed zamknięciem?', 'What would you like to do before closing?'),
+            wrap=True,
+            justify=Gtk.Justification.CENTER,
+        )
+        question.set_halign(Gtk.Align.CENTER)
+        question.add_css_class('title-3')
+        content.append(question)
+
+        description = Gtk.Label(
+            label=self._L(
+                'Możesz skopiować gotowy obraz do schowka albo zamknąć edytor bez kopiowania.',
+                'You can copy the finished image to the clipboard or close the editor without copying.'
+            ),
+            wrap=True,
+            justify=Gtk.Justification.CENTER,
+        )
+        description.set_halign(Gtk.Align.CENTER)
+        description.set_max_width_chars(54)
+        description.add_css_class('dim-label')
+        content.append(description)
+
         checkbox = Gtk.CheckButton(label=self._L('Nie pytaj ponownie', 'Do not ask again'))
-        checkbox.set_margin_top(10)
+        checkbox.set_halign(Gtk.Align.CENTER)
+        checkbox.set_margin_top(4)
+        checkbox.set_margin_bottom(4)
         content.append(checkbox)
-        def response(dlg, response_id):
+
+        buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        buttons.set_halign(Gtk.Align.CENTER)
+        buttons.set_homogeneous(True)
+        buttons.set_margin_top(4)
+        content.append(buttons)
+
+        cancel_btn = Gtk.Button(label=self._L('Anuluj', 'Cancel'))
+        copy_btn = Gtk.Button(label=self._L('Kopiuj i zamknij', 'Copy and close'))
+        close_btn = Gtk.Button(label=self._L('Zamknij', 'Close'))
+        copy_btn.add_css_class('suggested-action')
+        close_btn.add_css_class('destructive-action')
+        for btn in (cancel_btn, copy_btn, close_btn):
+            btn.set_size_request(138, 38)
+            buttons.append(btn)
+
+        def remember_choice():
             if checkbox.get_active():
                 self.editor_state['confirm_close'] = False
                 save_editor_state(self.editor_state)
-            if response_id == Gtk.ResponseType.APPLY:
-                self._copy_to_clipboard()
-                self._closing_programmatically = True
-                dlg.destroy()
-                self.close()
-                return
-            if response_id == Gtk.ResponseType.CLOSE:
-                self._closing_programmatically = True
-                dlg.destroy()
-                self.close()
-                return
-            dlg.destroy()
-        dialog.connect('response', response)
+
+        def cancel_clicked(_button):
+            remember_choice()
+            dialog.destroy()
+
+        def copy_clicked(_button):
+            remember_choice()
+            self._copy_to_clipboard()
+            self._closing_programmatically = True
+            dialog.destroy()
+            self.close()
+
+        def close_clicked(_button):
+            remember_choice()
+            self._closing_programmatically = True
+            dialog.destroy()
+            self.close()
+
+        cancel_btn.connect('clicked', cancel_clicked)
+        copy_btn.connect('clicked', copy_clicked)
+        close_btn.connect('clicked', close_clicked)
         dialog.present()
         return True
 

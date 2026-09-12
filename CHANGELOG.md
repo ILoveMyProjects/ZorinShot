@@ -2,6 +2,56 @@
 
 Wszystkie istotne zmiany Zorin Shot są opisywane w tym pliku. Sekcja odpowiadająca tagowi wersji jest automatycznie używana jako opis GitHub Release i wyświetlana w zakładce **Aktualizacje** aplikacji.
 
+## [0.3.8] - 2026-09-12
+
+### Naprawiono
+- Usunięto błędne powiązanie pionowej pozycji prawego panelu z pionowym wycentrowaniem obrazu. **Tools / Tool options / Elements / Image details** są teraz zakotwiczone u góry sidebara od pierwszej klatki, niezależnie od rozmiaru screenshotu i poziomu zoomu.
+- Naprawiono opóźnione pojawianie się prawego panelu po otwarciu edytora.
+- Mały, wycentrowany screenshot nie przesuwa już panelu Tools na środek okna; powiększanie obrazu nie zmienia pionowej pozycji sidebara.
+
+## [0.3.7] - 2026-09-12
+
+### Naprawiono
+- Prawy panel nie ma już stałej sztucznej przerwy 18 px u góry. Początek sekcji **Tools** jest dynamicznie synchronizowany z faktyczną górną krawędzią wycentrowanego obrazu.
+- Ujednolicono tło całej prawej kolumny, włącznie z viewportem przewijania i obszarem pod nagłówkami sekcji. Nie ma już dwóch różnych odcieni pod `Tools`, `Tool options`, `Elements` i `Image details`.
+- Nagłówki sekcji mają przezroczyste tło i dziedziczą dokładnie ten sam kolor co reszta sidebara.
+
+## [0.3.6] - 2026-09-12
+
+### Zmieniono
+- Okno potwierdzenia zamknięcia ma teraz wycentrowany układ: ikonę, pytanie, opis, checkbox **Nie pytaj ponownie** i trzy równe przyciski na środku.
+- Przyciski zamknięcia są czytelnie rozróżnione: **Anuluj**, **Kopiuj i zamknij** oraz **Zamknij**.
+
+### Naprawiono
+- Przywrócono pionowe i poziome centrowanie obrazu w obszarze roboczym, tak jak przed zmianą z wersji 0.3.5.
+
+## [0.3.5] - 2026-09-12
+
+### Naprawiono
+- Naprawiono przycisk **Fit / Dopasuj**: przy każdym użyciu ponownie odczytuje rzeczywisty rozmiar viewportu po zmianie rozmiaru lub maksymalizacji okna.
+- Obraz jest teraz wyrównany od góry do tej samej linii co panel **Tools**, zamiast zmieniać pionowe położenie przez centrowanie.
+
+### Dodano
+- **Ctrl + kółko myszy** nad obrazem powiększa i pomniejsza zoom.
+
+### Zmieniono
+- Nagłówki **Tools**, **Tool options**, **Elements** i **Image details** nie są już częścią obramowanej karty. Są zwykłymi nagłówkami z paddingiem, a ramka obejmuje tylko zawartość sekcji.
+- Usunięto ciemniejszy pasek/tło bezpośrednio pod nagłówkami sekcji.
+- Prawy panel i górna krawędź obrazu zaczynają się na tej samej wysokości.
+- Tool Options pozostaje dynamiczne i używa naturalnej wysokości aktywnych opcji.
+
+## [0.3.4] - 2026-09-12
+
+### Naprawiono
+- Komunikat instalacyjny / welcome popup korzysta teraz z wykrytego języka systemu: angielski system dostaje komunikaty po angielsku, polski po polsku.
+- Usunięto białe linie łączące kolejne znaczniki **Number**. Przyczyną był pozostający w Cairo aktywny path pomiędzy kolejnymi okręgami; każda adnotacja ma teraz izolowaną ścieżkę rysowania.
+- Motyw **Ciemny / Jasny / Systemowy** działa również w samym edytorze i zmienia się na żywo, gdy ustawienie zostanie przełączone w centrum Zorin Shot.
+- Dodano poprawny padding i wspólne karty dla sekcji **Tools**, **Tool Options**, **Elements** i **Image details**, aby nagłówki nie dotykały krawędzi sekcji.
+
+### Zmieniono
+- **Pióro** jest teraz pierwszym narzędziem na liście i domyślnie aktywnym po otwarciu edytora.
+- Sidebar w ciemnym motywie korzysta z ciemniejszych kolorów, a obszar roboczy i karty są spójne z wybranym motywem.
+
 ## [0.3.3] - 2026-09-12
 
 ### Zmieniono

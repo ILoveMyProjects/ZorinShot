@@ -196,17 +196,29 @@ fi
 command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$DESKTOP_DST" >/dev/null 2>&1 || true
 command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" >/dev/null 2>&1 || true
 
-if [[ "$UPDATE_MODE" == true ]]; then
-  MESSAGE='Aktualizacja Zorin Shot została zainstalowana.\n\nWyloguj się i zaloguj ponownie, aby GNOME Shell załadował nową wersję rozszerzenia.'
+if [[ "$DETECTED_LANG" == "en" ]]; then
+  if [[ "$UPDATE_MODE" == true ]]; then
+    MESSAGE='The Zorin Shot update has been installed.\n\nLog out and sign back in so GNOME Shell can load the new extension version.'
+  else
+    MESSAGE='Zorin Shot has been installed.\n\nLog out of Zorin OS and sign back in.\n\nAfter signing in again:\n• Zorin Shot will enable automatically,\n• the new icon will appear next to the original screenshot button,\n• Print Screen will launch Zorin Shot,\n• Super + Print Screen will remain available for the original screenshot / screen recording tool,\n• the Zorin Shot application will open automatically the first time.\n\nYou do not need to enter any additional commands.'
+  fi
+  POPUP_TITLE='Zorin Shot — installation complete'
+  NOTIFY_TEXT='Log out and sign back in.'
 else
-  MESSAGE='Zorin Shot został zainstalowany.\n\nWyloguj się z Zorina i zaloguj ponownie.\n\nPo ponownym logowaniu:\n• Zorin Shot włączy się automatycznie,\n• nowa ikona pojawi się obok oryginalnego aparatu,\n• Print Screen będzie uruchamiał Zorin Shot,\n• Super + Print Screen zostanie dla oryginalnego screenshotu / nagrywania,\n• aplikacja Zorin Shot otworzy się automatycznie pierwszy raz.\n\nNie musisz wpisywać żadnych dodatkowych komend.'
+  if [[ "$UPDATE_MODE" == true ]]; then
+    MESSAGE='Aktualizacja Zorin Shot została zainstalowana.\n\nWyloguj się i zaloguj ponownie, aby GNOME Shell załadował nową wersję rozszerzenia.'
+  else
+    MESSAGE='Zorin Shot został zainstalowany.\n\nWyloguj się z Zorina i zaloguj ponownie.\n\nPo ponownym logowaniu:\n• Zorin Shot włączy się automatycznie,\n• nowa ikona pojawi się obok oryginalnego aparatu,\n• Print Screen będzie uruchamiał Zorin Shot,\n• Super + Print Screen zostanie dla oryginalnego screenshotu / nagrywania,\n• aplikacja Zorin Shot otworzy się automatycznie pierwszy raz.\n\nNie musisz wpisywać żadnych dodatkowych komend.'
+  fi
+  POPUP_TITLE='Zorin Shot — instalacja zakończona'
+  NOTIFY_TEXT='Wyloguj się i zaloguj ponownie.'
 fi
 
 if [[ "$SHOW_POPUP" == true ]]; then
   if command -v zenity >/dev/null 2>&1 && [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
-    zenity --info --title='Zorin Shot — instalacja zakończona' --width=540 --text="$MESSAGE" || true
+    zenity --info --title="$POPUP_TITLE" --width=540 --text="$MESSAGE" || true
   elif command -v notify-send >/dev/null 2>&1 && [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
-    notify-send -u normal -t 15000 'Zorin Shot — instalacja zakończona' 'Wyloguj się i zaloguj ponownie.' || true
+    notify-send -u normal -t 15000 "$POPUP_TITLE" "$NOTIFY_TEXT" || true
   fi
 fi
 

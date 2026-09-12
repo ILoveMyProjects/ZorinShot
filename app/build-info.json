@@ -1,5 +1,5 @@
 {
-  "version": "0.3.3",
+  "version": "0.3.8",
   "github_repo": "ILoveMyProjects/ZorinShot",
   "build_channel": "source-linked",
   "asset_pattern": "zorin-shot-{version}.zip"
