@@ -19,6 +19,8 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
 from gi.repository import Gtk, Gdk, Gio, GLib
 
+from i18n import tr
+
 APP_ID = 'io.local.ZorinShot.Control'
 SCHEMA_ID = 'org.gnome.shell.extensions.zorin-shot'
 EXT_UUID = 'zorin-shot@local'
@@ -81,13 +83,13 @@ def human_size(value):
     return ''
 
 
-def safe_extract(zip_path, destination):
+def safe_extract(zip_path, destination, lang='pl'):
     destination = Path(destination).resolve()
     with zipfile.ZipFile(zip_path, 'r') as archive:
         for member in archive.infolist():
             target = (destination / member.filename).resolve()
             if target != destination and destination not in target.parents:
-                raise RuntimeError(f'Niebezpieczna ścieżka w paczce aktualizacji: {member.filename}')
+                raise RuntimeError(tr(lang, 'unsafe_path', path=member.filename))
         archive.extractall(destination)
 
 
@@ -103,10 +105,23 @@ class ControlWindow(Gtk.ApplicationWindow):
         self.latest_release = None
         self.update_thread = None
         self.settings = self._load_settings()
+        self.lang = self._read_language()
 
         self._build_ui()
         self._load_settings_into_ui()
         self._maybe_auto_check()
+
+    def _read_language(self):
+        if self.settings is None:
+            return 'pl'
+        try:
+            value = self.settings.get_string('language')
+            return value if value in ('pl', 'en') else 'pl'
+        except Exception:
+            return 'pl'
+
+    def _t(self, key, **kwargs):
+        return tr(self.lang, key, **kwargs)
 
     def _load_settings(self):
         schema_dir = EXT_DIR / 'schemas'
@@ -118,7 +133,7 @@ class ControlWindow(Gtk.ApplicationWindow):
                 raise RuntimeError(f'Nie znaleziono schematu {SCHEMA_ID}')
             return Gio.Settings.new_full(schema, None, None)
         except Exception as exc:
-            self._fatal_message = f'Nie udało się otworzyć ustawień Zorin Shot: {exc}'
+            self._fatal_message = tr('pl', 'settings_load_failed', error=exc)
             return None
 
     def _build_ui(self):
@@ -130,7 +145,7 @@ class ControlWindow(Gtk.ApplicationWindow):
         title_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         title = Gtk.Label(label='Zorin Shot')
         title.add_css_class('title')
-        subtitle = Gtk.Label(label=f'wersja {self.current_version}')
+        subtitle = Gtk.Label(label=self._t('version', version=self.current_version))
         subtitle.add_css_class('dim-label')
         title_box.append(title)
         title_box.append(subtitle)
@@ -154,9 +169,9 @@ class ControlWindow(Gtk.ApplicationWindow):
         root.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
         root.append(self.stack)
 
-        self.stack.add_titled(self._settings_page(), 'settings', 'Ustawienia')
-        self.stack.add_titled(self._about_page(), 'about', 'O programie')
-        self.stack.add_titled(self._updates_page(), 'updates', 'Aktualizacje')
+        self.stack.add_titled(self._settings_page(), 'settings', self._t('settings_tab'))
+        self.stack.add_titled(self._about_page(), 'about', self._t('about_tab'))
+        self.stack.add_titled(self._updates_page(), 'updates', self._t('updates_tab'))
 
         if getattr(self, '_fatal_message', None):
             GLib.idle_add(self._show_dialog, 'Zorin Shot', self._fatal_message)
@@ -216,60 +231,76 @@ class ControlWindow(Gtk.ApplicationWindow):
         scroll, content = self._page_scroller()
 
         section, box = self._section(
-            'Integracja z Zorin / GNOME',
-            'Oryginalny aparat GNOME pozostaje bez zmian. Zorin Shot może dodać drugi przycisk obok niego.'
+            self._t('integration_title'),
+            self._t('integration_desc')
         )
         content.append(section)
 
         self.show_button_switch = Gtk.Switch()
         self.show_button_switch.connect('notify::active', self._setting_bool_changed, 'show-action-button')
         box.append(self._row(
-            'Pokaż ikonę Zorin Shot obok oryginalnego aparatu',
-            'Nowa ikona robi zrzut do edytora Zorin Shot; stara nadal obsługuje systemowy screenshot i nagrywanie.',
+            self._t('show_button'),
+            self._t('show_button_desc'),
             self.show_button_switch,
         ))
         self._append_separator(box)
 
         mode_model = Gtk.StringList.new([
-            'Obszar — zachowaj otwarte menu',
-            'Cały widoczny pulpit',
-            'Aktywne okno',
+            self._t('mode_native'),
+            self._t('mode_full'),
+            self._t('mode_window'),
         ])
         self.mode_dropdown = Gtk.DropDown(model=mode_model)
-        self.mode_dropdown.set_size_request(240, -1)
+        self.mode_dropdown.set_size_request(280, -1)
         self.mode_dropdown.connect('notify::selected', self._mode_changed)
         box.append(self._row(
-            'Domyślny tryb przechwytywania',
-            'Tryb obszaru najpierw zamraża aktualny ekran, dzięki czemu można przechwycić otwarte Quick Settings.',
+            self._t('capture_mode'),
+            self._t('capture_mode_desc'),
             self.mode_dropdown,
         ))
         self._append_separator(box)
 
         self.cursor_switch = Gtk.Switch()
         self.cursor_switch.connect('notify::active', self._setting_bool_changed, 'include-cursor')
-        box.append(self._row('Dołącz kursor myszy', None, self.cursor_switch))
+        box.append(self._row(self._t('include_cursor'), None, self.cursor_switch))
 
         keyboard_section, keyboard_box = self._section(
-            'Klawisze',
-            'Zorin Shot może przejąć zwykły Print Screen, pozostawiając oryginalny panel GNOME pod Super + Print Screen.'
+            self._t('keyboard_title'),
+            self._t('keyboard_desc')
         )
         content.append(keyboard_section)
 
         self.replace_print_switch = Gtk.Switch()
         self.replace_print_switch.connect('notify::active', self._setting_bool_changed, 'replace-print-screen')
         keyboard_box.append(self._row(
-            'Print Screen → Zorin Shot',
-            'Po włączeniu Super + Print Screen pozostaje skrótem do oryginalnego screenshotu / nagrywania GNOME.',
+            self._t('replace_print'),
+            self._t('replace_print_desc'),
             self.replace_print_switch,
         ))
 
-        update_section, update_box = self._section('Aktualizacje')
+        language_section, language_box = self._section(
+            self._t('language_title'),
+            self._t('language_desc')
+        )
+        content.append(language_section)
+        language_model = Gtk.StringList.new([
+            self._t('language_pl'),
+            self._t('language_en'),
+        ])
+        self.language_dropdown = Gtk.DropDown(model=language_model)
+        self.language_dropdown.set_size_request(180, -1)
+        self.language_dropdown.connect('notify::selected', self._language_changed)
+        language_box.append(self._row(
+            self._t('language_row'), None, self.language_dropdown
+        ))
+
+        update_section, update_box = self._section(self._t('updates_title'))
         content.append(update_section)
         self.auto_update_switch = Gtk.Switch()
         self.auto_update_switch.connect('notify::active', self._setting_bool_changed, 'auto-check-updates')
         update_box.append(self._row(
-            'Automatycznie sprawdzaj aktualizacje',
-            'Przy otwieraniu Zorin Shot sprawdzenie jest wykonywane najwyżej raz na 6 godzin.',
+            self._t('auto_updates'),
+            self._t('auto_updates_desc'),
             self.auto_update_switch,
         ))
 
@@ -287,11 +318,11 @@ class ControlWindow(Gtk.ApplicationWindow):
         name = Gtk.Label(label='Zorin Shot')
         name.add_css_class('title-1')
         hero.append(name)
-        ver = Gtk.Label(label=f'Wersja {self.current_version}')
+        ver = Gtk.Label(label=self._t('version', version=self.current_version))
         ver.add_css_class('dim-label')
         hero.append(ver)
         summary = Gtk.Label(
-            label='Natywne narzędzie do zrzutów ekranu dla Zorin OS 18 / GNOME 46 z własnym edytorem adnotacji.',
+            label=self._t('about_summary'),
             wrap=True,
             justify=Gtk.Justification.CENTER,
         )
@@ -299,59 +330,59 @@ class ControlWindow(Gtk.ApplicationWindow):
         hero.append(summary)
         content.append(hero)
 
-        about_section, about_box = self._section('O aplikacji')
+        about_section, about_box = self._section(self._t('about_app'))
         content.append(about_section)
         about_box.append(self._row(
-            'Przechwytywanie',
-            'Osobny przycisk w Quick Settings, tryb obszaru zachowujący otwarte menu, pełny pulpit i aktywne okno.'
+            self._t('capture_title'),
+            self._t('capture_desc')
         ))
         self._append_separator(about_box)
         about_box.append(self._row(
-            'Edytor',
-            'Pióro, marker, strzałki, figury, tekst, cenzura, kadrowanie, undo/redo, zoom, kopiowanie i zapis PNG.'
+            self._t('editor_title'),
+            self._t('editor_desc')
         ))
         self._append_separator(about_box)
-        about_box.append(self._row('Platforma', 'Zorin OS 18 / GNOME Shell 46'))
+        about_box.append(self._row(self._t('platform'), 'Zorin OS 18 / GNOME Shell 46'))
 
-        repo_section, repo_box = self._section('Projekt')
+        repo_section, repo_box = self._section(self._t('project'))
         content.append(repo_section)
-        repo_text = self.repo if self.repo else 'Repozytorium zostanie wpisane automatycznie podczas budowania paczki w GitHub Actions.'
-        self.repo_button = Gtk.Button(label='Otwórz repozytorium GitHub')
+        repo_text = self.repo if self.repo else self._t('repo_pending')
+        self.repo_button = Gtk.Button(label=self._t('open_repo'))
         self.repo_button.set_sensitive(bool(self.repo))
         self.repo_button.connect('clicked', self._open_repo)
-        repo_box.append(self._row('Repozytorium', repo_text, self.repo_button))
+        repo_box.append(self._row(self._t('repository'), repo_text, self.repo_button))
 
         return scroll
 
     def _updates_page(self):
         scroll, content = self._page_scroller()
 
-        version_section, version_box = self._section('Wersje')
+        version_section, version_box = self._section(self._t('versions'))
         content.append(version_section)
         self.current_version_label = Gtk.Label(label=self.current_version)
         self.current_version_label.set_selectable(True)
-        version_box.append(self._row('Zainstalowana wersja', None, self.current_version_label))
+        version_box.append(self._row(self._t('installed_version'), None, self.current_version_label))
         self._append_separator(version_box)
-        self.latest_version_label = Gtk.Label(label='Jeszcze nie sprawdzono')
+        self.latest_version_label = Gtk.Label(label=self._t('not_checked'))
         self.latest_version_label.set_selectable(True)
-        version_box.append(self._row('Najnowsza wersja na GitHubie', None, self.latest_version_label))
+        version_box.append(self._row(self._t('latest_github'), None, self.latest_version_label))
 
-        action_section, action_box = self._section('Aktualizacja')
+        action_section, action_box = self._section(self._t('update'))
         content.append(action_section)
         action_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         action_row.set_margin_top(12)
         action_row.set_margin_bottom(12)
         action_row.set_margin_start(14)
         action_row.set_margin_end(14)
-        self.check_button = Gtk.Button(label='Sprawdź aktualizacje')
+        self.check_button = Gtk.Button(label=self._t('check_updates'))
         self.check_button.connect('clicked', lambda *_: self.check_updates(manual=True))
         action_row.append(self.check_button)
-        self.update_button = Gtk.Button(label='Pobierz i zainstaluj aktualizację')
+        self.update_button = Gtk.Button(label=self._t('download_install'))
         self.update_button.add_css_class('suggested-action')
         self.update_button.set_sensitive(False)
         self.update_button.connect('clicked', self._install_latest)
         action_row.append(self.update_button)
-        self.release_button = Gtk.Button(label='Otwórz wydanie na GitHubie')
+        self.release_button = Gtk.Button(label=self._t('open_release'))
         self.release_button.set_sensitive(False)
         self.release_button.connect('clicked', self._open_release)
         action_row.append(self.release_button)
@@ -359,19 +390,19 @@ class ControlWindow(Gtk.ApplicationWindow):
 
         self.progress = Gtk.ProgressBar()
         self.progress.set_show_text(True)
-        self.progress.set_text('Gotowe')
+        self.progress.set_text(self._t('ready'))
         self.progress.set_margin_start(14)
         self.progress.set_margin_end(14)
         self.progress.set_margin_bottom(12)
         action_box.append(self.progress)
 
-        self.update_status = Gtk.Label(label='Kliknij „Sprawdź aktualizacje”, aby pobrać informacje z GitHub Releases.', xalign=0, wrap=True)
+        self.update_status = Gtk.Label(label=self._t('click_check'), xalign=0, wrap=True)
         self.update_status.set_margin_start(14)
         self.update_status.set_margin_end(14)
         self.update_status.set_margin_bottom(12)
         action_box.append(self.update_status)
 
-        changelog_section, changelog_box = self._section('Changelog najnowszej wersji')
+        changelog_section, changelog_box = self._section(self._t('changelog_latest'))
         content.append(changelog_section)
         self.changelog = Gtk.TextView()
         self.changelog.set_editable(False)
@@ -382,7 +413,7 @@ class ControlWindow(Gtk.ApplicationWindow):
         self.changelog.set_top_margin(10)
         self.changelog.set_bottom_margin(10)
         self.changelog.set_size_request(-1, 230)
-        self.changelog.get_buffer().set_text('Changelog pojawi się tutaj po sprawdzeniu aktualizacji.')
+        self.changelog.get_buffer().set_text(self._t('changelog_wait'))
         changelog_scroll = Gtk.ScrolledWindow()
         changelog_scroll.set_min_content_height(230)
         changelog_scroll.set_child(self.changelog)
@@ -390,10 +421,7 @@ class ControlWindow(Gtk.ApplicationWindow):
 
         if not self.repo:
             self.check_button.set_sensitive(False)
-            self.update_status.set_text(
-                'Ta lokalna paczka nie jest jeszcze powiązana z repozytorium. '
-                'Po zbudowaniu projektu przez GitHub Actions repozytorium zostanie wpisane automatycznie i aktualizator zacznie działać.'
-            )
+            self.update_status.set_text(self._t('repo_unbound'))
 
         return scroll
 
@@ -404,6 +432,7 @@ class ControlWindow(Gtk.ApplicationWindow):
                 self.mode_dropdown,
                 self.cursor_switch,
                 self.replace_print_switch,
+                self.language_dropdown,
                 self.auto_update_switch,
             ):
                 widget.set_sensitive(False)
@@ -415,9 +444,13 @@ class ControlWindow(Gtk.ApplicationWindow):
             self.cursor_switch.set_active(self.settings.get_boolean('include-cursor'))
             self.replace_print_switch.set_active(self.settings.get_boolean('replace-print-screen'))
             self.auto_update_switch.set_active(self.settings.get_boolean('auto-check-updates'))
-            modes = ['region', 'full', 'window']
+            modes = ['native', 'full', 'window']
             mode = self.settings.get_string('capture-mode')
+            if mode == 'region':
+                mode = 'native'
+                self.settings.set_string('capture-mode', 'native')
             self.mode_dropdown.set_selected(modes.index(mode) if mode in modes else 0)
+            self.language_dropdown.set_selected(1 if self.lang == 'en' else 0)
         finally:
             self._loading_settings = False
 
@@ -427,24 +460,42 @@ class ControlWindow(Gtk.ApplicationWindow):
         try:
             self.settings.set_boolean(key, switch.get_active())
         except Exception as exc:
-            self._show_dialog('Błąd ustawień', str(exc))
+            self._show_dialog(self._t('settings_error'), str(exc))
 
     def _mode_changed(self, dropdown, _pspec):
         if getattr(self, '_loading_settings', False) or self.settings is None:
             return
-        modes = ['region', 'full', 'window']
+        modes = ['native', 'full', 'window']
         index = dropdown.get_selected()
         if 0 <= index < len(modes):
             try:
                 self.settings.set_string('capture-mode', modes[index])
             except Exception as exc:
-                self._show_dialog('Błąd ustawień', str(exc))
+                self._show_dialog(self._t('settings_error'), str(exc))
+
+    def _language_changed(self, dropdown, _pspec):
+        if getattr(self, '_loading_settings', False) or self.settings is None:
+            return
+        languages = ['pl', 'en']
+        index = dropdown.get_selected()
+        if not (0 <= index < len(languages)):
+            return
+        new_lang = languages[index]
+        if new_lang == self.lang:
+            return
+        try:
+            self.settings.set_string('language', new_lang)
+            self.lang = new_lang
+            self._build_ui()
+            self._load_settings_into_ui()
+        except Exception as exc:
+            self._show_dialog(self._t('settings_error'), str(exc))
 
     def _open_uri(self, uri):
         try:
             Gio.AppInfo.launch_default_for_uri(uri, None)
         except Exception as exc:
-            self._show_dialog('Nie udało się otworzyć linku', str(exc))
+            self._show_dialog(self._t('open_link_error'), str(exc))
 
     def _open_repo(self, *_args):
         if self.repo:
@@ -478,8 +529,8 @@ class ControlWindow(Gtk.ApplicationWindow):
         self.update_button.set_sensitive(False)
         self.progress.set_fraction(0.0)
         self.progress.pulse()
-        self.progress.set_text('Sprawdzanie…')
-        self.update_status.set_text('Łączenie z GitHub Releases…')
+        self.progress.set_text(self._t('checking'))
+        self.update_status.set_text(self._t('connecting_github'))
         self.update_thread = threading.Thread(target=self._check_worker, args=(manual,), daemon=True)
         self.update_thread.start()
 
@@ -496,30 +547,30 @@ class ControlWindow(Gtk.ApplicationWindow):
             url = f'https://api.github.com/repos/{self.repo}/releases/latest'
             release = self._request_json(url)
             if not isinstance(release, dict) or not release.get('tag_name'):
-                raise RuntimeError('GitHub nie zwrócił prawidłowej informacji o najnowszym wydaniu.')
+                raise RuntimeError(self._t('github_invalid'))
             GLib.idle_add(self._check_success, release)
         except urllib.error.HTTPError as exc:
             if exc.code == 404:
-                message = 'Repozytorium nie ma jeszcze opublikowanego GitHub Release.'
+                message = self._t('github_no_release')
             elif exc.code == 403:
-                message = 'GitHub odmówił zapytania (limit API lub brak dostępu). Spróbuj ponownie później.'
+                message = self._t('github_forbidden')
             else:
-                message = f'GitHub zwrócił błąd HTTP {exc.code}.'
+                message = self._t('github_http', code=exc.code)
             GLib.idle_add(self._check_failed, message, manual)
         except Exception as exc:
-            GLib.idle_add(self._check_failed, f'Nie udało się sprawdzić aktualizacji: {exc}', manual)
+            GLib.idle_add(self._check_failed, self._t('update_check_failed', error=exc), manual)
 
     def _check_success(self, release):
         self.latest_release = release
         tag = str(release.get('tag_name') or '').strip()
         latest = tag.lstrip('vV') or tag
-        body = str(release.get('body') or '').strip() or 'Brak opisu zmian dla tego wydania.'
+        body = str(release.get('body') or '').strip() or self._t('no_release_notes')
         self.latest_version_label.set_text(latest)
         self.changelog.get_buffer().set_text(body)
         self.release_button.set_sensitive(bool(release.get('html_url')))
         self.check_button.set_sensitive(True)
         self.progress.set_fraction(1.0)
-        self.progress.set_text('Sprawdzono')
+        self.progress.set_text(self._t('checked'))
 
         if self.settings is not None:
             try:
@@ -533,23 +584,21 @@ class ControlWindow(Gtk.ApplicationWindow):
                 self.update_button.set_sensitive(True)
                 size = human_size(asset.get('size'))
                 suffix = f' ({size})' if size else ''
-                self.update_status.set_text(f'Dostępna jest nowa wersja {latest}{suffix}. Możesz zainstalować ją bez terminala.')
+                self.update_status.set_text(self._t('new_version', version=latest, suffix=suffix))
             else:
-                self.update_status.set_text(
-                    f'Wersja {latest} jest nowsza, ale Release nie zawiera oczekiwanej paczki zorin-shot-{latest}.zip.'
-                )
+                self.update_status.set_text(self._t('missing_asset', version=latest))
         else:
             self.update_button.set_sensitive(False)
-            self.update_status.set_text(f'Masz aktualną wersję Zorin Shot ({self.current_version}).')
+            self.update_status.set_text(self._t('up_to_date', version=self.current_version))
         return GLib.SOURCE_REMOVE
 
     def _check_failed(self, message, manual):
         self.check_button.set_sensitive(bool(self.repo))
         self.progress.set_fraction(0.0)
-        self.progress.set_text('Błąd')
+        self.progress.set_text(self._t('error'))
         self.update_status.set_text(message)
         if manual:
-            self._show_dialog('Aktualizacje Zorin Shot', message)
+            self._show_dialog(self._t('updates_dialog'), message)
         return GLib.SOURCE_REMOVE
 
     def _find_release_asset(self, release, latest):
@@ -570,14 +619,14 @@ class ControlWindow(Gtk.ApplicationWindow):
         latest = str(self.latest_release.get('tag_name') or '').lstrip('vV')
         asset = self._find_release_asset(self.latest_release, latest)
         if not asset:
-            self._show_dialog('Aktualizacja', 'Nie znaleziono paczki aktualizacji w GitHub Release.')
+            self._show_dialog(self._t('update'), self._t('no_update_package'))
             return
 
         self.check_button.set_sensitive(False)
         self.update_button.set_sensitive(False)
         self.progress.set_fraction(0.0)
-        self.progress.set_text('Pobieranie…')
-        self.update_status.set_text(f'Pobieranie Zorin Shot {latest}…')
+        self.progress.set_text(self._t('downloading'))
+        self.update_status.set_text(self._t('downloading_version', version=latest))
         self.update_thread = threading.Thread(target=self._update_worker, args=(self.latest_release, asset, latest), daemon=True)
         self.update_thread.start()
 
@@ -597,7 +646,7 @@ class ControlWindow(Gtk.ApplicationWindow):
 
     def _set_download_progress(self, fraction):
         self.progress.set_fraction(max(0.0, min(1.0, fraction)))
-        self.progress.set_text(f'Pobieranie… {int(fraction * 100)}%')
+        self.progress.set_text(f"{self._t('downloading')} {int(fraction * 100)}%")
         return GLib.SOURCE_REMOVE
 
     def _expected_sha256(self, release, asset, temp_dir):
@@ -622,26 +671,26 @@ class ControlWindow(Gtk.ApplicationWindow):
         try:
             zip_path = Path(temp_dir) / str(asset.get('name') or 'zorin-shot-update.zip')
             self._download(asset['browser_download_url'], zip_path, progress=True)
-            GLib.idle_add(self._set_stage, 'Weryfikacja SHA-256…', 1.0)
+            GLib.idle_add(self._set_stage, self._t('verifying'), 1.0)
 
             expected = self._expected_sha256(release, asset, temp_dir)
             if not expected:
-                raise RuntimeError('Release nie zawiera sumy SHA-256. Dla bezpieczeństwa aktualizacja nie zostanie uruchomiona.')
+                raise RuntimeError(self._t('missing_sha'))
             actual = hashlib.sha256(zip_path.read_bytes()).hexdigest().lower()
             if actual != expected:
-                raise RuntimeError('Suma SHA-256 pobranej paczki jest nieprawidłowa. Aktualizacja została przerwana.')
+                raise RuntimeError(self._t('bad_sha'))
 
             extract_dir = Path(temp_dir) / 'extracted'
             extract_dir.mkdir(parents=True, exist_ok=True)
-            GLib.idle_add(self._set_stage, 'Rozpakowywanie…', 1.0)
-            safe_extract(zip_path, extract_dir)
+            GLib.idle_add(self._set_stage, self._t('extracting'), 1.0)
+            safe_extract(zip_path, extract_dir, self.lang)
             installers = list(extract_dir.rglob('install.sh'))
             installers = [p for p in installers if (p.parent / 'app').is_dir() and (p.parent / 'extension').is_dir()]
             if len(installers) != 1:
-                raise RuntimeError('Paczka aktualizacji nie ma prawidłowej struktury instalatora.')
+                raise RuntimeError(self._t('bad_package'))
 
             installer = installers[0]
-            GLib.idle_add(self._set_stage, 'Instalowanie…', 1.0)
+            GLib.idle_add(self._set_stage, self._t('installing'), 1.0)
             env = os.environ.copy()
             env['ZORIN_SHOT_UPDATE'] = '1'
             result = subprocess.run(
@@ -655,7 +704,7 @@ class ControlWindow(Gtk.ApplicationWindow):
             )
             if result.returncode != 0:
                 tail = '\n'.join(result.stdout.splitlines()[-20:])
-                raise RuntimeError(f'Instalator zakończył się kodem {result.returncode}.\n\n{tail}')
+                raise RuntimeError(self._t('installer_failed', code=result.returncode, tail=tail))
             GLib.idle_add(self._update_success, latest)
         except Exception as exc:
             GLib.idle_add(self._update_failed, str(exc))
@@ -674,13 +723,11 @@ class ControlWindow(Gtk.ApplicationWindow):
         self.update_button.set_sensitive(False)
         self.check_button.set_sensitive(True)
         self.progress.set_fraction(1.0)
-        self.progress.set_text('Zainstalowano')
-        self.update_status.set_text(
-            f'Zorin Shot {latest} został zainstalowany. Wyloguj się i zaloguj ponownie, aby GNOME Shell załadował nową wersję rozszerzenia.'
-        )
+        self.progress.set_text(self._t('installed'))
+        self.update_status.set_text(self._t('update_success_status', version=latest))
         self._show_dialog(
-            'Aktualizacja zakończona',
-            f'Zorin Shot {latest} został zainstalowany.\n\nWyloguj się i zaloguj ponownie, aby nowa wersja rozszerzenia GNOME została załadowana.'
+            self._t('update_success_title'),
+            self._t('update_success_dialog', version=latest)
         )
         return GLib.SOURCE_REMOVE
 
@@ -688,14 +735,14 @@ class ControlWindow(Gtk.ApplicationWindow):
         self.check_button.set_sensitive(bool(self.repo))
         self.update_button.set_sensitive(bool(self.latest_release))
         self.progress.set_fraction(0.0)
-        self.progress.set_text('Błąd aktualizacji')
+        self.progress.set_text(self._t('update_error'))
         self.update_status.set_text(message)
-        self._show_dialog('Aktualizacja nie powiodła się', message)
+        self._show_dialog(self._t('update_failed_title'), message)
         return GLib.SOURCE_REMOVE
 
     def _show_dialog(self, title, message):
         dialog = Gtk.Dialog(transient_for=self, modal=True, title=title)
-        dialog.add_button('OK', Gtk.ResponseType.OK)
+        dialog.add_button(self._t('ok'), Gtk.ResponseType.OK)
         label = Gtk.Label(label=message, wrap=True, xalign=0)
         label.set_max_width_chars(75)
         label.set_margin_top(18)

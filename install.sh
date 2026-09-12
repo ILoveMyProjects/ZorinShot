@@ -74,23 +74,38 @@ fi
 
 install -m 0755 "$HERE/app/zorin-shot-editor.py" "$APP_DST/zorin-shot-editor.py"
 install -m 0755 "$HERE/app/zorin-shot-control.py" "$APP_DST/zorin-shot-control.py"
+install -m 0644 "$HERE/app/i18n.py" "$APP_DST/i18n.py"
 install -m 0755 "$HERE/app/zorin-shot-first-login.sh" "$APP_DST/zorin-shot-first-login.sh"
 install -m 0644 "$HERE/app/build-info.json" "$APP_DST/build-info.json"
 install -m 0644 "$HERE/VERSION" "$APP_DST/VERSION"
 install -m 0644 "$HERE/CHANGELOG.md" "$APP_DST/CHANGELOG.md"
-sed "s|__ZORIN_SHOT_CONTROL__|$APP_DST/zorin-shot-control.py|g" "$HERE/app/io.local.ZorinShot.desktop" > "$DESKTOP_DST/io.local.ZorinShot.desktop"
-chmod 0644 "$DESKTOP_DST/io.local.ZorinShot.desktop"
+# Desktop IDs must match Gtk.Application IDs so GNOME/Wayland associates
+# application windows with the Zorin Shot icon instead of a generic icon.
+rm -f "$DESKTOP_DST/io.local.ZorinShot.desktop" "$DESKTOP_DST/io.local.ZorinShot.Control.desktop" "$DESKTOP_DST/io.local.ZorinShot.Editor.desktop"
+sed "s|__ZORIN_SHOT_CONTROL__|$APP_DST/zorin-shot-control.py|g" "$HERE/app/io.local.ZorinShot.Control.desktop" > "$DESKTOP_DST/io.local.ZorinShot.Control.desktop"
+chmod 0644 "$DESKTOP_DST/io.local.ZorinShot.Control.desktop"
+sed "s|__ZORIN_SHOT_EDITOR__|$APP_DST/zorin-shot-editor.py|g" "$HERE/app/io.local.ZorinShot.Editor.desktop" > "$DESKTOP_DST/io.local.ZorinShot.Editor.desktop"
+chmod 0644 "$DESKTOP_DST/io.local.ZorinShot.Editor.desktop"
 sed "s|__ZORIN_SHOT_CONTROL__|$APP_DST/zorin-shot-control.py|g" "$HERE/app/zorin-shot-settings.desktop" > "$DESKTOP_DST/zorin-shot-settings.desktop"
 chmod 0644 "$DESKTOP_DST/zorin-shot-settings.desktop"
 install -m 0644 "$HERE/icons/zorin-shot.svg" "$ICON_DST/zorin-shot.svg"
+install -m 0644 "$HERE/icons/zorin-shot-symbolic.svg" "$ICON_DST/zorin-shot-symbolic.svg"
 install -m 0644 "$HERE/icons/zorin-shot-symbolic.svg" "$EXT_DST/zorin-shot-symbolic.svg"
 
 if [[ "$UPDATE_MODE" == false ]]; then
   # Fresh-install defaults only. Updates must not overwrite user preferences.
   gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" show-action-button true
   gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" replace-print-screen true
-  gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" capture-mode 'region'
+  gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" capture-mode 'native'
+  gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" language 'pl'
   gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" auto-check-updates true
+else
+  # 0.2.0 changes the primary workflow to GNOME's native screenshot chooser.
+  # Force that mode once during this upgrade so an older full-screen setting
+  # cannot keep producing the behavior this release is specifically fixing.
+  gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" capture-mode 'native'
+  gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" show-action-button true
+  gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" replace-print-screen true
 fi
 
 # Disable the old Gradia bridge if it is still present. Keep its files intact.

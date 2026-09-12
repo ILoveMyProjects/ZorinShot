@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Zorin Shot Editor
+Name[pl]=Edytor Zorin Shot
+Comment=Zorin Shot annotation editor
+Comment[pl]=Edytor adnotacji Zorin Shot
+Exec="__ZORIN_SHOT_EDITOR__" --image %f
+Icon=zorin-shot
+Terminal=false
+NoDisplay=true
+MimeType=image/png;
+StartupNotify=true
+StartupWMClass=io.local.ZorinShot.Editor

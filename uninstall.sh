@@ -32,7 +32,10 @@ fi
 
 rm -rf "$EXT_DST" "$APP_DST"
 rm -f "$HOME/.local/share/applications/io.local.ZorinShot.desktop"
+rm -f "$HOME/.local/share/applications/io.local.ZorinShot.Control.desktop"
+rm -f "$HOME/.local/share/applications/io.local.ZorinShot.Editor.desktop"
 rm -f "$HOME/.local/share/applications/zorin-shot-settings.desktop"
 rm -f "$HOME/.local/share/icons/hicolor/scalable/apps/zorin-shot.svg"
+rm -f "$HOME/.local/share/icons/hicolor/scalable/apps/zorin-shot-symbolic.svg"
 rm -f "$HOME/.config/autostart/zorin-shot-first-login.desktop"
 printf 'Zorin Shot usunięty. Wyloguj się i zaloguj ponownie, jeśli ikona nadal jest widoczna.\n'

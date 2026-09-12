@@ -6,12 +6,12 @@
       <summary>Show a second screenshot button in Quick Settings</summary>
     </key>
     <key name="capture-mode" type="s">
-      <default>'region'</default>
-      <summary>Capture mode: region, full, or window</summary>
+      <default>'native'</default>
+      <summary>Capture mode: native, full, or window</summary>
     </key>
     <key name="include-cursor" type="b">
       <default>false</default>
-      <summary>Include pointer in screenshots</summary>
+      <summary>Include pointer in direct full-screen/window captures</summary>
     </key>
     <key name="replace-print-screen" type="b">
       <default>true</default>
@@ -32,6 +32,10 @@
     <key name="saved-native-valid" type="b">
       <default>false</default>
       <summary>Whether the saved GNOME shortcut is valid</summary>
+    </key>
+    <key name="language" type="s">
+      <default>'pl'</default>
+      <summary>Application language: pl or en</summary>
     </key>
     <key name="auto-check-updates" type="b">
       <default>true</default>

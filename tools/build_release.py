@@ -78,6 +78,19 @@ def validate_project(project_root):
     else:
         print('warning: node not found; JS syntax validation skipped')
 
+    bash = shutil.which('bash')
+    if bash:
+        for path in [project_root / 'install.sh', project_root / 'uninstall.sh',
+                     project_root / 'app' / 'zorin-shot-first-login.sh']:
+            run([bash, '-n', str(path)], cwd=project_root)
+
+    desktop_validate = shutil.which('desktop-file-validate')
+    if desktop_validate:
+        for path in (project_root / 'app').glob('*.desktop'):
+            run([desktop_validate, str(path)], cwd=project_root)
+    else:
+        print('warning: desktop-file-validate not found; desktop entry validation skipped')
+
     schema_dir = project_root / 'extension' / 'zorin-shot@local' / 'schemas'
     compiler = shutil.which('glib-compile-schemas')
     if compiler:

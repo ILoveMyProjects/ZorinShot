@@ -10,3 +10,4 @@ Terminal=false
 Categories=Graphics;Utility;Settings;
 Keywords=screenshot;screen shot;capture;annotation;update;zrzut;ekran;Zorin Shot;
 StartupNotify=true
+StartupWMClass=io.local.ZorinShot.Control

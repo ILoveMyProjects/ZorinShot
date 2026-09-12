@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install build validators
-        run: sudo apt-get update && sudo apt-get install -y libglib2.0-bin nodejs
+        run: sudo apt-get update && sudo apt-get install -y libglib2.0-bin nodejs desktop-file-utils
 
       - name: Verify tag matches VERSION
         if: startsWith(github.ref, 'refs/tags/v')

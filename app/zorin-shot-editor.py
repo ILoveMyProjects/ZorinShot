@@ -13,6 +13,7 @@ try:
     gi.require_version('Gdk', '4.0')
     from gi.repository import Gtk, Gdk, Gio, GLib
     import cairo
+    from i18n import tr
 except Exception as exc:
     sys.stderr.write(
         'Zorin Shot: missing GTK/PyGObject dependencies.\n'
@@ -21,7 +22,22 @@ except Exception as exc:
     )
     raise SystemExit(2)
 
-APP_ID = 'io.local.ZorinShot'
+APP_ID = 'io.local.ZorinShot.Editor'
+SCHEMA_ID = 'org.gnome.shell.extensions.zorin-shot'
+EXT_SCHEMA_DIR = Path.home() / '.local/share/gnome-shell/extensions/zorin-shot@local/schemas'
+
+
+def read_language():
+    try:
+        source = Gio.SettingsSchemaSource.new_from_directory(
+            str(EXT_SCHEMA_DIR), Gio.SettingsSchemaSource.get_default(), False)
+        schema = source.lookup(SCHEMA_ID, False)
+        if schema is None:
+            return 'pl'
+        settings = Gio.Settings.new_full(schema, None, None)
+        return 'en' if settings.get_string('language') == 'en' else 'pl'
+    except Exception:
+        return 'pl'
 
 
 def clamp(value, lo, hi):
@@ -37,19 +53,20 @@ def norm_rect(x1, y1, x2, y2):
 
 
 class EditorWindow(Gtk.ApplicationWindow):
-    TOOL_LABELS = [
-        ('crop', 'Kadruj'),
-        ('pen', 'Pióro'),
-        ('highlighter', 'Marker'),
-        ('arrow', 'Strzałka'),
-        ('rect', 'Prostokąt'),
-        ('ellipse', 'Elipsa'),
-        ('text', 'Tekst'),
-        ('redact', 'Cenzura'),
+    TOOLS = [
+        ('crop', 'tool_crop'),
+        ('pen', 'tool_pen'),
+        ('highlighter', 'tool_highlighter'),
+        ('arrow', 'tool_arrow'),
+        ('rect', 'tool_rect'),
+        ('ellipse', 'tool_ellipse'),
+        ('text', 'tool_text'),
+        ('redact', 'tool_redact'),
     ]
 
     def __init__(self, app, image_path, select_region=False):
         super().__init__(application=app, title='Zorin Shot')
+        self.lang = read_language()
         self.set_default_size(1200, 800)
         self.maximize()
 
@@ -57,7 +74,7 @@ class EditorWindow(Gtk.ApplicationWindow):
         try:
             self.base = cairo.ImageSurface.create_from_png(str(self.image_path))
         except Exception as exc:
-            raise RuntimeError(f'Nie można otworzyć PNG: {exc}') from exc
+            raise RuntimeError(self._t('png_open_failed', error=exc)) from exc
 
         self.img_w = self.base.get_width()
         self.img_h = self.base.get_height()
@@ -75,6 +92,9 @@ class EditorWindow(Gtk.ApplicationWindow):
 
         self._build_ui(select_region)
         self._update_canvas_size()
+
+    def _t(self, key, **kwargs):
+        return tr(self.lang, key, **kwargs)
 
     def _initial_zoom(self):
         try:
@@ -102,8 +122,8 @@ class EditorWindow(Gtk.ApplicationWindow):
 
         first = None
         self.tool_buttons = {}
-        for key, label in self.TOOL_LABELS:
-            b = Gtk.ToggleButton(label=label)
+        for key, label_key in self.TOOLS:
+            b = Gtk.ToggleButton(label=self._t(label_key))
             if first is None:
                 first = b
             else:
@@ -119,34 +139,34 @@ class EditorWindow(Gtk.ApplicationWindow):
         rgba = Gdk.RGBA()
         rgba.red, rgba.green, rgba.blue, rgba.alpha = self.color
         self.color_button.set_rgba(rgba)
-        self.color_button.set_tooltip_text('Kolor')
+        self.color_button.set_tooltip_text(self._t('tooltip_color'))
         self.color_button.connect('color-set', self._color_changed)
         toolbar.append(self.color_button)
 
         self.width_spin = Gtk.SpinButton.new_with_range(1, 40, 1)
         self.width_spin.set_value(self.stroke_width)
-        self.width_spin.set_tooltip_text('Grubość linii')
+        self.width_spin.set_tooltip_text(self._t('tooltip_width'))
         self.width_spin.connect('value-changed', lambda w: setattr(self, 'stroke_width', w.get_value()))
         toolbar.append(self.width_spin)
 
         toolbar.append(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL))
 
-        undo = Gtk.Button(label='Cofnij')
+        undo = Gtk.Button(label=self._t('undo'))
         undo.connect('clicked', lambda *_: self._undo())
         toolbar.append(undo)
-        redo = Gtk.Button(label='Ponów')
+        redo = Gtk.Button(label=self._t('redo'))
         redo.connect('clicked', lambda *_: self._redo())
         toolbar.append(redo)
 
         zoom_out = Gtk.Button(label='−')
-        zoom_out.set_tooltip_text('Pomniejsz')
+        zoom_out.set_tooltip_text(self._t('zoom_out'))
         zoom_out.connect('clicked', lambda *_: self._set_zoom(self.zoom / 1.2))
         toolbar.append(zoom_out)
         zoom_in = Gtk.Button(label='+')
-        zoom_in.set_tooltip_text('Powiększ')
+        zoom_in.set_tooltip_text(self._t('zoom_in'))
         zoom_in.connect('clicked', lambda *_: self._set_zoom(self.zoom * 1.2))
         toolbar.append(zoom_in)
-        fit = Gtk.Button(label='Dopasuj')
+        fit = Gtk.Button(label=self._t('fit'))
         fit.connect('clicked', lambda *_: self._fit())
         toolbar.append(fit)
 
@@ -154,11 +174,11 @@ class EditorWindow(Gtk.ApplicationWindow):
         spacer.set_hexpand(True)
         toolbar.append(spacer)
 
-        copy_btn = Gtk.Button(label='Kopiuj')
+        copy_btn = Gtk.Button(label=self._t('copy'))
         copy_btn.add_css_class('suggested-action')
         copy_btn.connect('clicked', lambda *_: self._copy_to_clipboard())
         toolbar.append(copy_btn)
-        save_btn = Gtk.Button(label='Zapisz jako…')
+        save_btn = Gtk.Button(label=self._t('save_as'))
         save_btn.connect('clicked', lambda *_: self._save_as())
         toolbar.append(save_btn)
 
@@ -196,22 +216,23 @@ class EditorWindow(Gtk.ApplicationWindow):
         self.add_controller(keys)
 
         if select_region:
-            self.status.set_text('Przeciągnij myszą po obrazie, aby wybrać obszar. Zrzut został już wykonany, więc otwarte menu jest zachowane.')
+            self.status.set_text(self._t('region_hint'))
         else:
             self._set_status_for_tool()
 
     def _set_status_for_tool(self):
         messages = {
-            'crop': 'Kadrowanie: przeciągnij prostokąt. Kadrowanie można cofnąć.',
-            'pen': 'Pióro: rysuj swobodnie.',
-            'highlighter': 'Marker: półprzezroczyste zaznaczanie.',
-            'arrow': 'Strzałka: przeciągnij od początku do końca.',
-            'rect': 'Prostokąt: przeciągnij.',
-            'ellipse': 'Elipsa: przeciągnij.',
-            'text': 'Tekst: kliknij miejsce i wpisz tekst.',
-            'redact': 'Cenzura: przeciągnij obszar, który ma zostać zasłonięty.',
+            'crop': 'status_crop',
+            'pen': 'status_pen',
+            'highlighter': 'status_highlighter',
+            'arrow': 'status_arrow',
+            'rect': 'status_rect',
+            'ellipse': 'status_ellipse',
+            'text': 'status_text',
+            'redact': 'status_redact',
         }
-        self.status.set_text(messages.get(self.tool, ''))
+        key = messages.get(self.tool)
+        self.status.set_text(self._t(key) if key else '')
 
     def _on_tool_toggled(self, button, tool):
         if button.get_active():
@@ -313,16 +334,16 @@ class EditorWindow(Gtk.ApplicationWindow):
         self._ask_text(ix, iy)
 
     def _ask_text(self, x, y):
-        dialog = Gtk.Dialog(transient_for=self, modal=True, title='Dodaj tekst')
-        dialog.add_button('Anuluj', Gtk.ResponseType.CANCEL)
-        dialog.add_button('Dodaj', Gtk.ResponseType.OK)
+        dialog = Gtk.Dialog(transient_for=self, modal=True, title=self._t('add_text'))
+        dialog.add_button(self._t('cancel'), Gtk.ResponseType.CANCEL)
+        dialog.add_button(self._t('add'), Gtk.ResponseType.OK)
         box = dialog.get_content_area()
         box.set_margin_top(12)
         box.set_margin_bottom(12)
         box.set_margin_start(12)
         box.set_margin_end(12)
         entry = Gtk.Entry()
-        entry.set_placeholder_text('Wpisz tekst…')
+        entry.set_placeholder_text(self._t('text_placeholder'))
         entry.set_activates_default(True)
         box.append(entry)
         dialog.set_default_response(Gtk.ResponseType.OK)
@@ -393,7 +414,7 @@ class EditorWindow(Gtk.ApplicationWindow):
         })
         self.redo_stack.clear()
         self._fit()
-        self.status.set_text(f'Wybrany obszar: {w} × {h} px. Teraz możesz nanosić adnotacje.')
+        self.status.set_text(self._t('selected_area', w=w, h=h))
 
     def _shift_annotation(self, ann, dx, dy):
         kind = ann.get('kind')
@@ -471,7 +492,7 @@ class EditorWindow(Gtk.ApplicationWindow):
         elif kind in ('rect', 'ellipse', 'redact'):
             x, y, w, h = norm_rect(*ann['start'], *ann['end'])
             if kind == 'redact':
-                cr.set_source_rgba(0.05, 0.05, 0.05, 0.96)
+                cr.set_source_rgba(0.0, 0.0, 0.0, 1.0)
                 cr.rectangle(x, y, w, h)
                 cr.fill()
             elif kind == 'rect':
@@ -576,7 +597,7 @@ class EditorWindow(Gtk.ApplicationWindow):
             content = Gdk.ContentProvider.new_for_bytes('image/png', png_bytes)
             clipboard = Gdk.Display.get_default().get_clipboard()
             clipboard.set_content(content)
-            self.status.set_text('Skopiowano obraz do schowka.')
+            self.status.set_text(self._t('copied'))
             # Keep the file briefly: some clipboard backends may consume lazily.
             GLib.timeout_add_seconds(30, self._delete_temp, path)
         except Exception as exc:
@@ -584,7 +605,7 @@ class EditorWindow(Gtk.ApplicationWindow):
                 os.unlink(path)
             except OSError:
                 pass
-            self._error(f'Nie udało się skopiować obrazu: {exc}')
+            self._error(self._t('copy_failed', error=exc))
 
     def _delete_temp(self, path):
         try:
@@ -599,8 +620,8 @@ class EditorWindow(Gtk.ApplicationWindow):
 
     def _save_as(self):
         dialog = Gtk.FileChooserNative.new(
-            'Zapisz zrzut ekranu', self, Gtk.FileChooserAction.SAVE,
-            '_Zapisz', '_Anuluj')
+            self._t('save_screenshot'), self, Gtk.FileChooserAction.SAVE,
+            self._t('save'), self._t('cancel_mnemonic'))
         dialog.set_current_name(self._default_save_name())
         pictures = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_PICTURES)
         if pictures:
@@ -621,17 +642,17 @@ class EditorWindow(Gtk.ApplicationWindow):
                     if not path.lower().endswith('.png'):
                         path += '.png'
                     self._render_flattened().write_to_png(path)
-                    self.status.set_text(f'Zapisano: {path}')
+                    self.status.set_text(self._t('saved', path=path))
         except Exception as exc:
-            self._error(f'Nie udało się zapisać pliku: {exc}')
+            self._error(self._t('save_failed', error=exc))
         finally:
             dialog.destroy()
             self._save_dialog = None
 
     def _error(self, message):
         self.status.set_text(message)
-        dialog = Gtk.Dialog(transient_for=self, modal=True, title='Zorin Shot — błąd')
-        dialog.add_button('OK', Gtk.ResponseType.OK)
+        dialog = Gtk.Dialog(transient_for=self, modal=True, title=self._t('editor_error'))
+        dialog.add_button(self._t('ok'), Gtk.ResponseType.OK)
         label = Gtk.Label(label=message, wrap=True)
         label.set_margin_top(16)
         label.set_margin_bottom(16)
