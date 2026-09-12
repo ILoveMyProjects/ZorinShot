@@ -1,23 +1,19 @@
 {
   "schema": 1,
   "uuid": "zorin-shot@local",
-  "version": 7,
-  "version_name": "0.3.9",
+  "version": 8,
+  "version_name": "0.3.12",
   "shell_versions": [
     "46"
   ],
-  "download_url": "https://github.com/ILoveMyProjects/ZorinShot/releases/download/v0.3.9/zorin-shot-0.3.9.zip",
-  "sha256": "79609a67091c14bdaecbe2565a9a809c4de32f83218198e6c575ffd81f813db7",
-  "release_url": "https://github.com/ILoveMyProjects/ZorinShot/releases/tag/v0.3.9",
+  "download_url": "https://github.com/ILoveMyProjects/ZorinShot/releases/download/v0.3.12/zorin-shot-0.3.12.zip",
+  "sha256": "29a390718b7298686b2b9bde50af4b2e91dd57801dfa3028f9c37abff7a97c5a",
+  "release_url": "https://github.com/ILoveMyProjects/ZorinShot/releases/tag/v0.3.12",
   "changelog": [
-    "GitHub Actions generuje stabilny `update.json` z numerem wersji, bezpośrednim URL paczki, SHA-256, kompatybilnością GNOME 46 i changelogiem.",
-    "Po utworzeniu tagu `vX.Y.Z` workflow tworzy/aktualizuje GitHub Release, publikuje ZIP i `SHA256SUMS`, a następnie zapisuje `update.json` na domyślnej gałęzi.",
-    "Dodano `package.sh` do lokalnego zbudowania dokładnie tej samej paczki co w GitHub Actions.",
-    "Dodano `update.json.example` dokumentujący format manifestu.",
-    "Updater Zorin Shot najpierw korzysta ze stabilnego `update.json`, podobnie jak ZorinTinyResourceMonitor.",
-    "GitHub Releases API pozostaje jako automatyczny fallback, jeśli manifest jest chwilowo niedostępny.",
-    "Paczka Release zawiera w `build-info.json` repozytorium, domyślną gałąź oraz adres manifestu aktualizacji.",
-    "Updater wymaga prawidłowego SHA-256 z manifestu lub `SHA256SUMS` przed uruchomieniem instalatora.",
-    "Manifest jest walidowany pod kątem UUID, wersji, HTTPS i zgodności z GNOME Shell 46."
-  ]
+    "Added `install-latest.sh` as the canonical one-command installer.",
+    "README now installs the latest published release with `curl -fsSL https://raw.githubusercontent.com/ILoveMyProjects/ZorinShot/master/install-latest.sh | bash`.",
+    "`install-latest.sh` is included in release ZIPs and validated by the release builder.",
+    "Kept `install-online.sh` for backwards compatibility with older links."
+  ],
+  "changelog_markdown": "## [0.3.12] - 2026-09-12\n\n### Changed\n- Added `install-latest.sh` as the canonical one-command installer.\n- README now installs the latest published release with `curl -fsSL https://raw.githubusercontent.com/ILoveMyProjects/ZorinShot/master/install-latest.sh | bash`.\n- `install-latest.sh` is included in release ZIPs and validated by the release builder.\n- Kept `install-online.sh` for backwards compatibility with older links."
 }
