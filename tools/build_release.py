@@ -12,6 +12,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_REPO = 'ILoveMyProjects/ZorinShot'
 RUNTIME_ITEMS = [
     'app',
     'extension',
@@ -123,7 +124,7 @@ def create_zip(source_dir, zip_path, top_name):
 def main():
     parser = argparse.ArgumentParser(description='Build a GitHub-ready Zorin Shot release package')
     parser.add_argument('--version', default=read_version())
-    parser.add_argument('--repo', default=detect_repo(), help='GitHub owner/repository; auto-detected in GitHub Actions')
+    parser.add_argument('--repo', default=detect_repo() or DEFAULT_REPO, help='GitHub owner/repository; auto-detected in GitHub Actions')
     parser.add_argument('--out', default=str(ROOT / 'dist'))
     args = parser.parse_args()
 

@@ -8,6 +8,7 @@ EXT_DST="$HOME/.local/share/gnome-shell/extensions/$UUID"
 APP_DST="$HOME/.local/lib/zorin-shot"
 DESKTOP_DST="$HOME/.local/share/applications"
 ICON_DST="$HOME/.local/share/icons/hicolor/scalable/apps"
+ACTION_ICON_DST="$HOME/.local/share/icons/hicolor/scalable/actions"
 AUTOSTART_DST="$HOME/.config/autostart"
 SCHEMA="org.gnome.shell.extensions.zorin-shot"
 UPDATE_MODE=false
@@ -20,6 +21,13 @@ for arg in "$@"; do
     *) printf 'Nieznana opcja instalatora: %s\n' "$arg" >&2; exit 2 ;;
   esac
 done
+
+# A downloaded newer release can be installed by double-clicking/running
+# install.sh directly. Detect an existing installation and automatically use
+# update semantics so user preferences are not reset.
+if [[ "$UPDATE_MODE" == false && ( -d "$EXT_DST" || -d "$APP_DST" ) ]]; then
+  UPDATE_MODE=true
+fi
 
 printf '\nZorin Shot — instalacja dla Zorin OS 18 / GNOME Shell 46\n\n'
 
@@ -58,7 +66,7 @@ MSG
   exit 2
 fi
 
-mkdir -p "$(dirname "$EXT_DST")" "$APP_DST" "$DESKTOP_DST" "$ICON_DST" "$AUTOSTART_DST"
+mkdir -p "$(dirname "$EXT_DST")" "$APP_DST" "$DESKTOP_DST" "$ICON_DST" "$ACTION_ICON_DST" "$AUTOSTART_DST"
 
 # Keep user GSettings values during updates. Replacing the extension directory
 # does not remove them because they live in dconf, not inside this directory.
@@ -81,28 +89,66 @@ install -m 0644 "$HERE/VERSION" "$APP_DST/VERSION"
 install -m 0644 "$HERE/CHANGELOG.md" "$APP_DST/CHANGELOG.md"
 # Desktop IDs must match Gtk.Application IDs so GNOME/Wayland associates
 # application windows with the Zorin Shot icon instead of a generic icon.
-rm -f "$DESKTOP_DST/io.local.ZorinShot.desktop" "$DESKTOP_DST/io.local.ZorinShot.Control.desktop" "$DESKTOP_DST/io.local.ZorinShot.Editor.desktop"
+rm -f \
+  "$DESKTOP_DST/io.local.ZorinShot.desktop" \
+  "$DESKTOP_DST/io.local.ZorinShot.Control.desktop" \
+  "$DESKTOP_DST/io.local.ZorinShot.Editor.desktop" \
+  "$DESKTOP_DST/zorin-shot-settings.desktop"
 sed "s|__ZORIN_SHOT_CONTROL__|$APP_DST/zorin-shot-control.py|g" "$HERE/app/io.local.ZorinShot.Control.desktop" > "$DESKTOP_DST/io.local.ZorinShot.Control.desktop"
 chmod 0644 "$DESKTOP_DST/io.local.ZorinShot.Control.desktop"
 sed "s|__ZORIN_SHOT_EDITOR__|$APP_DST/zorin-shot-editor.py|g" "$HERE/app/io.local.ZorinShot.Editor.desktop" > "$DESKTOP_DST/io.local.ZorinShot.Editor.desktop"
 chmod 0644 "$DESKTOP_DST/io.local.ZorinShot.Editor.desktop"
-sed "s|__ZORIN_SHOT_CONTROL__|$APP_DST/zorin-shot-control.py|g" "$HERE/app/zorin-shot-settings.desktop" > "$DESKTOP_DST/zorin-shot-settings.desktop"
-chmod 0644 "$DESKTOP_DST/zorin-shot-settings.desktop"
 install -m 0644 "$HERE/icons/zorin-shot.svg" "$ICON_DST/zorin-shot.svg"
 install -m 0644 "$HERE/icons/zorin-shot-symbolic.svg" "$ICON_DST/zorin-shot-symbolic.svg"
+# GTK4 uses the application-id as the default window icon. Install aliases
+# matching both application IDs so GNOME/Zorin does not show a generic puzzle.
+install -m 0644 "$HERE/icons/zorin-shot.svg" "$ICON_DST/io.local.ZorinShot.Control.svg"
+install -m 0644 "$HERE/icons/zorin-shot.svg" "$ICON_DST/io.local.ZorinShot.Editor.svg"
 install -m 0644 "$HERE/icons/zorin-shot-symbolic.svg" "$EXT_DST/zorin-shot-symbolic.svg"
+for icon in "$HERE"/icons/tools/*-symbolic.svg; do
+  install -m 0644 "$icon" "$ACTION_ICON_DST/$(basename "$icon")"
+done
+
+# Detect the current desktop language once. LANGUAGE is checked first because
+# GNOME may use it even when LANG/LC_* differ. Only Polish and English are
+# supported; every other locale falls back to English.
+DETECTED_LANG="$(python3 - <<'PYLANG'
+import os
+values = [
+    os.environ.get('LANGUAGE', ''),
+    os.environ.get('LC_ALL', ''),
+    os.environ.get('LC_MESSAGES', ''),
+    os.environ.get('LANG', ''),
+]
+for value in values:
+    for part in str(value).split(':'):
+        code = part.strip().lower().replace('-', '_')
+        if code.startswith('pl'):
+            print('pl')
+            raise SystemExit
+        if code.startswith('en'):
+            print('en')
+            raise SystemExit
+print('en')
+PYLANG
+)"
 
 if [[ "$UPDATE_MODE" == false ]]; then
-  # Fresh-install defaults only. Updates must not overwrite user preferences.
+  # Fresh-install defaults.
   gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" show-action-button true
   gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" replace-print-screen true
   gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" capture-mode 'native'
-  gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" language 'pl'
+  gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" language "$DETECTED_LANG"
+  gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" language-initialized true
   gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" auto-check-updates true
 else
-  # 0.2.0 changes the primary workflow to GNOME's native screenshot chooser.
-  # Force that mode once during this upgrade so an older full-screen setting
-  # cannot keep producing the behavior this release is specifically fixing.
+  # Keep user choices on updates, except for one-time migration from versions
+  # that hard-coded Polish on first install. The new key does not exist in old
+  # dconf data, so false means we still need to initialize from the OS locale.
+  if [[ "$(gsettings --schemadir "$EXT_DST/schemas" get "$SCHEMA" language-initialized 2>/dev/null || echo false)" != "true" ]]; then
+    gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" language "$DETECTED_LANG"
+    gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" language-initialized true
+  fi
   gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" capture-mode 'native'
   gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" show-action-button true
   gsettings --schemadir "$EXT_DST/schemas" set "$SCHEMA" replace-print-screen true

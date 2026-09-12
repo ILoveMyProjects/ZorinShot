@@ -22,7 +22,7 @@ const TEXT = {
         replace: 'Print Screen → Zorin Shot',
         replaceSub: 'Super + Print Screen → oryginalny screenshot / nagrywanie GNOME.',
         language: 'Język / Language',
-        languageSub: 'Język interfejsu Zorin Shot i edytora.',
+        languageSub: 'Język interfejsu Zorin Shot i edytora. Przy pierwszej instalacji jest wykrywany z języka systemu.',
         editor: 'Wbudowany edytor',
         editorDesc: 'Edytor jest częścią Zorin Shot — Gradia nie jest wymagana.',
         tools: 'Narzędzia',
@@ -45,7 +45,7 @@ const TEXT = {
         replace: 'Print Screen → Zorin Shot',
         replaceSub: 'Super + Print Screen → original GNOME screenshot / screen recording.',
         language: 'Language / Język',
-        languageSub: 'Language used by the Zorin Shot application and editor.',
+        languageSub: 'Language used by the Zorin Shot application and editor. On first install it is detected from the system language.',
         editor: 'Built-in editor',
         editorDesc: 'The editor is part of Zorin Shot — Gradia is not required.',
         tools: 'Tools',
@@ -109,6 +109,7 @@ export default class ZorinShotPreferences extends ExtensionPreferences {
         language.add(languageRow);
         languageRow.connect('notify::selected', row => {
             settings.set_string('language', row.selected === 1 ? 'en' : 'pl');
+            try { settings.set_boolean('language-initialized', true); } catch (_) {}
         });
 
         const editor = new Adw.PreferencesGroup({title: t.editor, description: t.editorDesc});

@@ -6,13 +6,12 @@ import Shell from 'gi://Shell';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as QuickSettings from 'resource:///org/gnome/shell/ui/quickSettings.js';
-import {PopupAnimation} from 'resource:///org/gnome/shell/ui/boxpointer.js';
 
 const UUID = 'zorin-shot@local';
 const KEYBINDING_NAME = 'capture-shortcut';
 const NATIVE_SCHEMA = 'org.gnome.shell.keybindings';
 const NATIVE_KEY = 'show-screenshot-ui';
-const SCREENSHOT_ONLY_MODE = 2; // GNOME Shell 46 screenshot.js UIMode.SCREENSHOT_ONLY
+const SCREENSHOT_ONLY_MODE = 2; // GNOME Shell 46: UIMode.SCREENSHOT_ONLY
 const EDITOR = GLib.build_filenamev([
     GLib.get_home_dir(), '.local', 'lib', 'zorin-shot', 'zorin-shot-editor.py',
 ]);
@@ -20,7 +19,6 @@ const EDITOR = GLib.build_filenamev([
 const TEXT = {
     pl: {
         action: 'Zorin Shot — zrzut z adnotacjami',
-        noQuickSettings: 'Nie znaleziono paska akcji Quick Settings w GNOME Shell 46.',
         editorMissing: 'Brak edytora Zorin Shot. Uruchom ponownie instalator.',
         editorLaunchFailed: 'Zrzut został wykonany, ale nie udało się uruchomić edytora.',
         nativeOpenFailed: 'Nie udało się otworzyć systemowego selektora zrzutu ekranu.',
@@ -30,7 +28,6 @@ const TEXT = {
     },
     en: {
         action: 'Zorin Shot — annotated screenshot',
-        noQuickSettings: 'Could not find the GNOME Shell 46 Quick Settings action bar.',
         editorMissing: 'The Zorin Shot editor is missing. Run the installer again.',
         editorLaunchFailed: 'The screenshot was captured, but the editor could not be started.',
         nativeOpenFailed: 'Could not open the system screenshot chooser.',
@@ -50,7 +47,9 @@ export default class ZorinShotExtension extends Extension {
         this._keybindingInstalled = false;
         this._signals = [];
         this._screenshotSignals = [];
+        this._quickSettingsMenuSignal = 0;
 
+        this._watchQuickSettingsMenu();
         this._syncButton();
         this._syncKeybinding();
 
@@ -67,6 +66,7 @@ export default class ZorinShotExtension extends Extension {
         this._removeKeybinding();
         this._restoreNativeBinding();
         this._cancelButtonRetry();
+        this._unwatchQuickSettingsMenu();
         this._removeButton();
 
         if (this._settings) {
@@ -79,12 +79,36 @@ export default class ZorinShotExtension extends Extension {
     }
 
     _language() {
-        const value = this._settings?.get_string('language') ?? 'pl';
-        return value === 'en' ? 'en' : 'pl';
+        const value = this._settings?.get_string('language') ?? 'en';
+        return value === 'pl' ? 'pl' : 'en';
     }
 
     _t(key) {
-        return TEXT[this._language()][key] ?? TEXT.pl[key] ?? key;
+        return TEXT[this._language()][key] ?? TEXT.en[key] ?? key;
+    }
+
+    _watchQuickSettingsMenu() {
+        const menu = Main.panel.statusArea.quickSettings?.menu;
+        if (!menu || this._quickSettingsMenuSignal)
+            return;
+        this._quickSettingsMenuSignal = menu.connect('open-state-changed', (_menu, isOpen) => {
+            if (!isOpen || !this._settings?.get_boolean('show-action-button'))
+                return;
+            // Zorin Taskbar can rebuild/move the system menu. Validate our parent
+            // every time the menu opens and reinsert the button if necessary.
+            if (this._button && !this._button.get_parent?.())
+                this._button = null;
+            if (!this._button)
+                this._tryAddButton();
+        });
+    }
+
+    _unwatchQuickSettingsMenu() {
+        const menu = Main.panel.statusArea.quickSettings?.menu;
+        if (menu && this._quickSettingsMenuSignal) {
+            try { menu.disconnect(this._quickSettingsMenuSignal); } catch (_) {}
+        }
+        this._quickSettingsMenuSignal = 0;
     }
 
     _syncButton() {
@@ -96,46 +120,90 @@ export default class ZorinShotExtension extends Extension {
         }
     }
 
-    _findScreenshotButton(actor) {
+    _iconName(actor) {
         if (!actor)
-            return null;
-
-        const direct = String(actor.icon_name ?? actor.iconName ?? '');
-        const nested = String(actor.get_child?.()?.icon_name ?? actor.get_child?.()?.iconName ?? '');
-        if (direct === 'screenshooter-symbolic' || nested === 'screenshooter-symbolic')
-            return actor;
-
-        let children = [];
-        try { children = actor.get_children?.() ?? []; } catch (_) {}
-        for (const child of children) {
-            const match = this._findScreenshotButton(child);
-            if (match)
-                return match;
+            return '';
+        for (const value of [actor.iconName, actor.icon_name]) {
+            if (value)
+                return String(value);
         }
-        return null;
+        try {
+            const value = actor.get_property?.('icon-name');
+            if (value)
+                return String(value);
+        } catch (_) {}
+        try {
+            const child = actor.get_child?.();
+            if (child && child !== actor)
+                return this._iconName(child);
+        } catch (_) {}
+        return '';
     }
 
-    _actionBox() {
-        // Stock GNOME Shell 46 keeps the action row here. Zorin may carry
-        // Shell patches, so fall back to locating the stock screenshot
-        // button in the visible Quick Settings actor tree and use its parent.
-        const quickSettings = Main.panel.statusArea.quickSettings;
-        const direct = quickSettings?._system?._systemItem?.child ?? null;
-        if (direct)
-            return direct;
+    _isScreenshotButton(actor) {
+        const icon = this._iconName(actor);
+        return icon === 'screenshooter-symbolic' ||
+            icon.includes('screenshot') || icon.includes('screenshooter');
+    }
 
-        const roots = [quickSettings?.menu?.box, quickSettings?.menu?.actor];
-        for (const root of roots) {
-            const screenshot = this._findScreenshotButton(root);
-            const parent = screenshot?.get_parent?.();
-            if (parent)
-                return parent;
+    _containsScreenshotButton(actor) {
+        if (!actor)
+            return false;
+        if (this._isScreenshotButton(actor))
+            return true;
+        let children = [];
+        try { children = actor.get_children?.() ?? []; } catch (_) {}
+        return children.some(child => this._containsScreenshotButton(child));
+    }
+
+    _systemActionBox() {
+        const quickSettings = Main.panel.statusArea.quickSettings;
+        if (!quickSettings)
+            return null;
+
+        // 1. Stock GNOME 46 SystemStatus.Indicator keeps SystemItem in both
+        // _systemItem and quickSettingsItems. The array is the more robust path
+        // for distro patches that rename the private field.
+        const indicator = quickSettings._system ?? null;
+        const candidates = [];
+        if (indicator?._systemItem)
+            candidates.push(indicator._systemItem);
+        try {
+            for (const item of indicator?.quickSettingsItems ?? [])
+                candidates.push(item);
+        } catch (_) {}
+
+        // 2. Fallback: find the system item directly in QuickSettingsMenu grid.
+        try {
+            for (const item of quickSettings.menu?._grid?.get_children?.() ?? [])
+                candidates.push(item);
+        } catch (_) {}
+
+        const seen = new Set();
+        for (const item of candidates) {
+            if (!item || seen.has(item))
+                continue;
+            seen.add(item);
+
+            let isSystemItem = false;
+            try {
+                isSystemItem = item.has_style_class_name?.('quick-settings-system-item') ?? false;
+            } catch (_) {}
+            if (!isSystemItem)
+                isSystemItem = this._containsScreenshotButton(item);
+            if (!isSystemItem)
+                continue;
+
+            const box = item.child ?? item.get_child?.() ?? null;
+            if (box?.get_children)
+                return box;
         }
+
         return null;
     }
 
     _scheduleButtonAdd() {
-        if (this._button)
+        if (this._button?.get_parent?.())
             return;
         if (this._tryAddButton())
             return;
@@ -153,9 +221,11 @@ export default class ZorinShotExtension extends Extension {
                 this._buttonRetryId = 0;
                 return GLib.SOURCE_REMOVE;
             }
-            if (this._buttonRetryCount >= 40) {
+            // Do not show a user-facing error. Zorin Taskbar can construct the
+            // row later; _watchQuickSettingsMenu() will retry whenever it opens.
+            if (this._buttonRetryCount >= 80) {
+                console.warn(`${UUID}: Quick Settings system action row not ready; will retry on menu open`);
                 this._buttonRetryId = 0;
-                Main.notify('Zorin Shot', this._t('noQuickSettings'));
                 return GLib.SOURCE_REMOVE;
             }
             return GLib.SOURCE_CONTINUE;
@@ -171,10 +241,11 @@ export default class ZorinShotExtension extends Extension {
     }
 
     _tryAddButton() {
-        if (this._button)
+        if (this._button?.get_parent?.())
             return true;
+        this._button = null;
 
-        const box = this._actionBox();
+        const box = this._systemActionBox();
         if (!box)
             return false;
 
@@ -186,19 +257,17 @@ export default class ZorinShotExtension extends Extension {
         });
         button.connect('clicked', () => this._capture(true));
 
-        // Put Zorin Shot directly after GNOME's built-in ScreenshotItem.
-        // In GNOME Shell 46 that item uses "screenshooter-symbolic".
         const children = box.get_children();
-        let stockIndex = children.findIndex(child => {
-            const direct = String(child.icon_name ?? child.iconName ?? '');
-            const nestedChild = child.get_child?.();
-            const nested = String(nestedChild?.icon_name ?? nestedChild?.iconName ?? '');
-            return direct === 'screenshooter-symbolic' || nested === 'screenshooter-symbolic' ||
-                direct.includes('screenshot') || nested.includes('screenshot') ||
-                direct.includes('camera') || nested.includes('camera');
-        });
-        if (stockIndex < 0)
-            stockIndex = 0;
+        let stockIndex = children.findIndex(child => this._isScreenshotButton(child));
+        // Stock GNOME 46 SystemItem order is: power, spacer, screenshot,
+        // settings, spacer, lock, shutdown. If a Zorin patch obscures the icon
+        // property but keeps that row, index 2 is still the screenshot action.
+        if (stockIndex < 0 && children.length >= 5)
+            stockIndex = 2;
+        if (stockIndex < 0) {
+            button.destroy();
+            return false;
+        }
 
         box.insert_child_at_index(button, Math.min(stockIndex + 1, children.length));
         this._button = button;
@@ -224,19 +293,17 @@ export default class ZorinShotExtension extends Extension {
         this._button = null;
     }
 
-    _capture(fromQuickSettings) {
+    _capture(_fromQuickSettings) {
         let mode = this._settings.get_string('capture-mode');
-        // Migration from the 0.1.x implementation where "region" meant
-        // "capture the whole stage and crop later".
         if (mode === 'region')
             mode = 'native';
 
         if (mode === 'full')
-            this._captureFull(fromQuickSettings);
+            this._captureFull();
         else if (mode === 'window')
-            this._captureWindow(fromQuickSettings);
+            this._captureWindow();
         else
-            this._captureWithNativeUI(fromQuickSettings);
+            this._captureWithNativeUI();
     }
 
     _disconnectScreenshotSignals() {
@@ -249,7 +316,7 @@ export default class ZorinShotExtension extends Extension {
         this._screenshotSignals = [];
     }
 
-    _captureWithNativeUI(fromQuickSettings) {
+    _captureWithNativeUI() {
         this._disconnectScreenshotSignals();
         const ui = Main.screenshotUI;
         if (!ui) {
@@ -266,24 +333,26 @@ export default class ZorinShotExtension extends Extension {
         const closedId = ui.connect('closed', () => this._disconnectScreenshotSignals());
         this._screenshotSignals = [takenId, closedId];
 
-        const openUi = () => {
+        try {
+            // GNOME 46 remembers the last screenshot type. Zorin Shot must open
+            // on Area Selection, so explicitly select it every time.
+            if (ui._selectionButton)
+                ui._selectionButton.checked = true;
+            if (ui._showPointerButton)
+                ui._showPointerButton.checked = this._settings.get_boolean('include-cursor');
+
+            // IMPORTANT: do not close Quick Settings here. ScreenshotUI.open()
+            // first snapshots the current stage and only afterwards emits
+            // system-modal-opened, which closes popup menus. This preserves the
+            // open Zorin/GNOME menu in the frozen screenshot while still giving
+            // the user the native area/window/screen chooser.
             ui.open(SCREENSHOT_ONLY_MODE).catch(error => {
                 this._disconnectScreenshotSignals();
                 this._fail(this._t('nativeOpenFailed'), error);
             });
-            return GLib.SOURCE_REMOVE;
-        };
-
-        if (fromQuickSettings) {
-            // Match GNOME Shell 46's own ScreenshotItem ordering: close the
-            // Quick Settings menu without animation, then open screenshot UI
-            // just before redraw.
-            const topMenu = Main.panel.statusArea.quickSettings.menu;
-            const laters = global.compositor.get_laters();
-            laters.add(Meta.LaterType.BEFORE_REDRAW, openUi);
-            topMenu.close(PopupAnimation.NONE);
-        } else {
-            openUi();
+        } catch (error) {
+            this._disconnectScreenshotSignals();
+            this._fail(this._t('nativeOpenFailed'), error);
         }
     }
 
@@ -300,7 +369,7 @@ export default class ZorinShotExtension extends Extension {
         return [file, stream];
     }
 
-    async _captureFull(fromQuickSettings) {
+    async _captureFull() {
         let file;
         let stream;
         try {
@@ -309,8 +378,7 @@ export default class ZorinShotExtension extends Extension {
             const cursor = this._settings.get_boolean('include-cursor');
             await shot.screenshot(cursor, stream);
             stream.close(null);
-            if (fromQuickSettings)
-                Main.panel.closeQuickSettings();
+            Main.panel.closeQuickSettings();
             this._launchEditor(file.get_path());
         } catch (error) {
             try { stream?.close(null); } catch (_) {}
@@ -318,7 +386,7 @@ export default class ZorinShotExtension extends Extension {
         }
     }
 
-    async _captureWindow(fromQuickSettings) {
+    async _captureWindow() {
         let file;
         let stream;
         try {
@@ -327,8 +395,7 @@ export default class ZorinShotExtension extends Extension {
             const cursor = this._settings.get_boolean('include-cursor');
             await shot.screenshot_window(true, cursor, stream);
             stream.close(null);
-            if (fromQuickSettings)
-                Main.panel.closeQuickSettings();
+            Main.panel.closeQuickSettings();
             this._launchEditor(file.get_path());
         } catch (error) {
             try { stream?.close(null); } catch (_) {}

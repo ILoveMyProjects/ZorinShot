@@ -10,7 +10,7 @@ Zorin Shot to narzędzie do zrzutów ekranu przygotowane dla **Zorin OS 18 / GNO
 - `Print Screen` może uruchamiać Zorin Shot, a `Super + Print Screen` pozostaje dla oryginalnego panelu GNOME.
 - Opcjonalne tryby bez pytania: cały pulpit i aktywne okno.
 - Wbudowany edytor: pióro, marker, strzałka, prostokąt, elipsa, tekst, **całkowicie nieprzezroczysta cenzura**, kadrowanie, undo/redo, zoom, kopiowanie i zapis PNG.
-- Interfejs po polsku lub angielsku, wybierany w Ustawieniach.
+- Interfejs po polsku lub angielsku. Przy pierwszej instalacji język jest automatycznie wykrywany z ustawień systemu, a później można go ręcznie zmienić w Ustawieniach.
 - Aplikacja **Zorin Shot** ma zakładki:
   - **Ustawienia / Settings** — integracja, tryb przechwytywania, kursor, Print Screen i język;
   - **O programie / About** — opis, wersja i link do repozytorium;
@@ -28,7 +28,7 @@ Po pierwszym ponownym logowaniu aplikacja Zorin Shot otworzy się automatycznie.
 
 ## Jak działa screenshot
 
-W domyślnym trybie `native` rozszerzenie otwiera `Main.screenshotUI` GNOME Shell 46 i czeka na sygnał `screenshot-taken`. Oznacza to, że wybór obszaru, okna albo ekranu wykonuje ten sam systemowy interfejs GNOME, a Zorin Shot przejmuje dopiero gotowy plik PNG i otwiera go w swoim edytorze.
+W domyślnym trybie `native` rozszerzenie otwiera `Main.screenshotUI` GNOME Shell 46 i wymusza start w trybie **Obszar**. Quick Settings nie jest zamykane przed otwarciem selektora: GNOME najpierw zamraża aktualny stage, a dopiero potem zamyka popupy, więc na zamrożonym obrazie może pozostać otwarte menu. Po wykonaniu zrzutu Zorin Shot odbiera sygnał `screenshot-taken` i otwiera gotowy PNG we własnym edytorze.
 
 ## Jak działa aktualizator
 
@@ -42,7 +42,7 @@ Repozytorium powinno być publiczne, jeśli aktualizacje mają działać bez tok
 
 Projekt jest gotowy do wrzucenia jako pojedyncze repozytorium. Workflow znajduje się w `.github/workflows/build-release.yml`.
 
-Na każdym pushu do `main` GitHub Actions sprawdza składnię Pythona i JavaScript, waliduje schema GSettings, buduje ZIP, generuje `SHA256SUMS` i udostępnia wynik jako artifact workflow.
+Na każdym pushu do `master` lub `main` GitHub Actions sprawdza składnię Pythona i JavaScript, waliduje schema GSettings, buduje ZIP, generuje `SHA256SUMS` i udostępnia wynik jako artifact workflow. Repozytorium docelowe to `ILoveMyProjects/ZorinShot`.
 
 Po wypchnięciu tagu `vX.Y.Z`, zgodnego z plikiem `VERSION`, workflow dodatkowo tworzy GitHub Release i publikuje `zorin-shot-X.Y.Z.zip` oraz `SHA256SUMS`. Opis Release jest pobierany z odpowiedniej sekcji `CHANGELOG.md`; ten sam tekst pojawia się później w zakładce **Aktualizacje**.
 

@@ -33,6 +33,23 @@ USER_AGENT = 'Zorin-Shot-Updater'
 AUTO_CHECK_INTERVAL = 6 * 60 * 60
 
 
+def detect_system_language():
+    values = [
+        os.environ.get('LANGUAGE', ''),
+        os.environ.get('LC_ALL', ''),
+        os.environ.get('LC_MESSAGES', ''),
+        os.environ.get('LANG', ''),
+    ]
+    for value in values:
+        for part in str(value).split(':'):
+            code = part.strip().lower().replace('-', '_')
+            if code.startswith('pl'):
+                return 'pl'
+            if code.startswith('en'):
+                return 'en'
+    return 'en'
+
+
 def load_build_info():
     info = {
         'version': '0.0.0',
@@ -96,6 +113,7 @@ def safe_extract(zip_path, destination, lang='pl'):
 class ControlWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title='Zorin Shot')
+        self.set_property('icon-name', APP_ID)
         self.set_default_size(820, 660)
         self.set_size_request(660, 520)
 
@@ -104,8 +122,10 @@ class ControlWindow(Gtk.ApplicationWindow):
         self.repo = str(self.build_info.get('github_repo') or '').strip()
         self.latest_release = None
         self.update_thread = None
+        self.system_lang = detect_system_language()
         self.settings = self._load_settings()
         self.lang = self._read_language()
+        self._apply_theme()
 
         self._build_ui()
         self._load_settings_into_ui()
@@ -113,15 +133,36 @@ class ControlWindow(Gtk.ApplicationWindow):
 
     def _read_language(self):
         if self.settings is None:
-            return 'pl'
+            return self.system_lang
         try:
             value = self.settings.get_string('language')
-            return value if value in ('pl', 'en') else 'pl'
+            return value if value in ('pl', 'en') else self.system_lang
         except Exception:
-            return 'pl'
+            return self.system_lang
 
     def _t(self, key, **kwargs):
         return tr(self.lang, key, **kwargs)
+
+    def _apply_theme(self):
+        theme = 'system'
+        if self.settings is not None:
+            try:
+                value = self.settings.get_string('app-theme')
+                if value in ('system', 'dark', 'light'):
+                    theme = value
+            except Exception:
+                pass
+        if theme == 'system':
+            prefer_dark = False
+            try:
+                prefer_dark = Gio.Settings.new('org.gnome.desktop.interface').get_string('color-scheme') == 'prefer-dark'
+            except Exception:
+                pass
+        else:
+            prefer_dark = theme == 'dark'
+        gtk_settings = Gtk.Settings.get_default()
+        if gtk_settings is not None:
+            gtk_settings.set_property('gtk-application-prefer-dark-theme', prefer_dark)
 
     def _load_settings(self):
         schema_dir = EXT_DIR / 'schemas'
@@ -150,7 +191,7 @@ class ControlWindow(Gtk.ApplicationWindow):
         title_box.append(title)
         title_box.append(subtitle)
         header.set_title_widget(title_box)
-        root.append(header)
+        self.set_titlebar(header)
 
         self.stack = Gtk.Stack()
         self.stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
@@ -290,9 +331,20 @@ class ControlWindow(Gtk.ApplicationWindow):
         self.language_dropdown = Gtk.DropDown(model=language_model)
         self.language_dropdown.set_size_request(180, -1)
         self.language_dropdown.connect('notify::selected', self._language_changed)
+        detected_name = self._t('language_pl') if self.system_lang == 'pl' else self._t('language_en')
         language_box.append(self._row(
-            self._t('language_row'), None, self.language_dropdown
+            self._t('language_row'),
+            self._t('system_language_detected', language=detected_name),
+            self.language_dropdown
         ))
+
+        appearance_section, appearance_box = self._section(self._t('theme_title'), self._t('theme_desc'))
+        content.append(appearance_section)
+        theme_model = Gtk.StringList.new([self._t('theme_system'), self._t('theme_dark'), self._t('theme_light')])
+        self.theme_dropdown = Gtk.DropDown(model=theme_model)
+        self.theme_dropdown.set_size_request(180, -1)
+        self.theme_dropdown.connect('notify::selected', self._theme_changed)
+        appearance_box.append(self._row(self._t('theme_row'), None, self.theme_dropdown))
 
         update_section, update_box = self._section(self._t('updates_title'))
         content.append(update_section)
@@ -433,6 +485,7 @@ class ControlWindow(Gtk.ApplicationWindow):
                 self.cursor_switch,
                 self.replace_print_switch,
                 self.language_dropdown,
+                self.theme_dropdown,
                 self.auto_update_switch,
             ):
                 widget.set_sensitive(False)
@@ -451,6 +504,9 @@ class ControlWindow(Gtk.ApplicationWindow):
                 self.settings.set_string('capture-mode', 'native')
             self.mode_dropdown.set_selected(modes.index(mode) if mode in modes else 0)
             self.language_dropdown.set_selected(1 if self.lang == 'en' else 0)
+            themes = ['system', 'dark', 'light']
+            current_theme = self.settings.get_string('app-theme')
+            self.theme_dropdown.set_selected(themes.index(current_theme) if current_theme in themes else 0)
         finally:
             self._loading_settings = False
 
@@ -485,9 +541,26 @@ class ControlWindow(Gtk.ApplicationWindow):
             return
         try:
             self.settings.set_string('language', new_lang)
+            try:
+                self.settings.set_boolean('language-initialized', True)
+            except Exception:
+                pass
             self.lang = new_lang
             self._build_ui()
             self._load_settings_into_ui()
+        except Exception as exc:
+            self._show_dialog(self._t('settings_error'), str(exc))
+
+    def _theme_changed(self, dropdown, _pspec):
+        if getattr(self, '_loading_settings', False) or self.settings is None:
+            return
+        themes = ['system', 'dark', 'light']
+        index = dropdown.get_selected()
+        if not (0 <= index < len(themes)):
+            return
+        try:
+            self.settings.set_string('app-theme', themes[index])
+            self._apply_theme()
         except Exception as exc:
             self._show_dialog(self._t('settings_error'), str(exc))
 
