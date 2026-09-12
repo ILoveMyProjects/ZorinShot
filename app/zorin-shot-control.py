@@ -11,6 +11,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import urllib.parse
 import zipfile
 from pathlib import Path
 
@@ -54,6 +55,8 @@ def load_build_info():
     info = {
         'version': '0.0.0',
         'github_repo': '',
+        'default_branch': 'master',
+        'update_manifest_url': '',
         'build_channel': 'unknown',
         'asset_pattern': 'zorin-shot-{version}.zip',
     }
@@ -120,6 +123,10 @@ class ControlWindow(Gtk.ApplicationWindow):
         self.build_info = load_build_info()
         self.current_version = str(self.build_info.get('version') or '0.0.0')
         self.repo = str(self.build_info.get('github_repo') or '').strip()
+        self.default_branch = str(self.build_info.get('default_branch') or 'master').strip() or 'master'
+        self.manifest_url = str(self.build_info.get('update_manifest_url') or '').strip()
+        if not self.manifest_url and self.repo:
+            self.manifest_url = f'https://raw.githubusercontent.com/{self.repo}/{self.default_branch}/update.json'
         self.latest_release = None
         self.update_thread = None
         self.system_lang = detect_system_language()
@@ -579,7 +586,7 @@ class ControlWindow(Gtk.ApplicationWindow):
             self._open_uri(self.latest_release['html_url'])
 
     def _maybe_auto_check(self):
-        if not self.repo or self.settings is None:
+        if (not self.repo and not self.manifest_url) or self.settings is None:
             return
         try:
             if not self.settings.get_boolean('auto-check-updates'):
@@ -596,7 +603,7 @@ class ControlWindow(Gtk.ApplicationWindow):
         return GLib.SOURCE_REMOVE
 
     def check_updates(self, manual=True):
-        if not self.repo or self.update_thread and self.update_thread.is_alive():
+        if (not self.repo and not self.manifest_url) or self.update_thread and self.update_thread.is_alive():
             return
         self.check_button.set_sensitive(False)
         self.update_button.set_sensitive(False)
@@ -608,30 +615,88 @@ class ControlWindow(Gtk.ApplicationWindow):
         self.update_thread.start()
 
     def _request_json(self, url):
-        request = urllib.request.Request(url, headers={
-            'Accept': GITHUB_API_ACCEPT,
-            'User-Agent': USER_AGENT,
-        })
+        headers = {'User-Agent': USER_AGENT}
+        if urllib.parse.urlparse(url).netloc == 'api.github.com':
+            headers['Accept'] = GITHUB_API_ACCEPT
+        else:
+            headers['Accept'] = 'application/json'
+        request = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(request, timeout=20) as response:
             return json.loads(response.read().decode('utf-8'))
 
+    def _release_from_manifest(self, manifest):
+        if not isinstance(manifest, dict) or manifest.get('schema') != 1:
+            raise RuntimeError('Invalid update manifest schema')
+        if manifest.get('uuid') != EXT_UUID:
+            raise RuntimeError('Update manifest UUID does not match Zorin Shot')
+        latest = str(manifest.get('version_name') or '').strip().lstrip('vV')
+        if not re.fullmatch(r'\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?', latest):
+            raise RuntimeError('Update manifest contains an invalid version')
+        download_url = str(manifest.get('download_url') or '').strip()
+        parsed = urllib.parse.urlparse(download_url)
+        if parsed.scheme != 'https' or not parsed.netloc:
+            raise RuntimeError('Update manifest contains an invalid download URL')
+        digest = str(manifest.get('sha256') or '').strip().lower()
+        if not re.fullmatch(r'[0-9a-f]{64}', digest):
+            raise RuntimeError('Update manifest contains an invalid SHA-256')
+        shell_versions = [str(v) for v in (manifest.get('shell_versions') or [])]
+        if shell_versions and '46' not in shell_versions:
+            raise RuntimeError('This update does not support GNOME Shell 46')
+        filename = Path(urllib.parse.unquote(parsed.path)).name or f'zorin-shot-{latest}.zip'
+        changelog = manifest.get('changelog') or []
+        if isinstance(changelog, list):
+            body = '\n'.join(f'• {str(item).strip()}' for item in changelog if str(item).strip())
+        else:
+            body = str(changelog).strip()
+        if not body:
+            body = self._t('no_release_notes')
+        release_url = str(manifest.get('release_url') or '').strip()
+        if not release_url and self.repo:
+            release_url = f'https://github.com/{self.repo}/releases/tag/v{latest}'
+        return {
+            'tag_name': f'v{latest}',
+            'body': body,
+            'html_url': release_url,
+            'assets': [{
+                'name': filename,
+                'browser_download_url': download_url,
+                'digest': f'sha256:{digest}',
+            }],
+            '_source': 'manifest',
+        }
+
     def _check_worker(self, manual):
-        try:
-            url = f'https://api.github.com/repos/{self.repo}/releases/latest'
-            release = self._request_json(url)
-            if not isinstance(release, dict) or not release.get('tag_name'):
-                raise RuntimeError(self._t('github_invalid'))
-            GLib.idle_add(self._check_success, release)
-        except urllib.error.HTTPError as exc:
-            if exc.code == 404:
-                message = self._t('github_no_release')
-            elif exc.code == 403:
-                message = self._t('github_forbidden')
-            else:
-                message = self._t('github_http', code=exc.code)
-            GLib.idle_add(self._check_failed, message, manual)
-        except Exception as exc:
-            GLib.idle_add(self._check_failed, self._t('update_check_failed', error=exc), manual)
+        errors = []
+        if self.manifest_url:
+            try:
+                manifest = self._request_json(self.manifest_url)
+                release = self._release_from_manifest(manifest)
+                GLib.idle_add(self._check_success, release)
+                return
+            except Exception as exc:
+                errors.append(f'manifest: {exc}')
+
+        if self.repo:
+            try:
+                url = f'https://api.github.com/repos/{self.repo}/releases/latest'
+                release = self._request_json(url)
+                if not isinstance(release, dict) or not release.get('tag_name'):
+                    raise RuntimeError(self._t('github_invalid'))
+                release['_source'] = 'github-api'
+                GLib.idle_add(self._check_success, release)
+                return
+            except urllib.error.HTTPError as exc:
+                if exc.code == 404:
+                    errors.append(self._t('github_no_release'))
+                elif exc.code == 403:
+                    errors.append(self._t('github_forbidden'))
+                else:
+                    errors.append(self._t('github_http', code=exc.code))
+            except Exception as exc:
+                errors.append(str(exc))
+
+        detail = '; '.join(errors) if errors else 'No update source is configured'
+        GLib.idle_add(self._check_failed, self._t('update_check_failed', error=detail), manual)
 
     def _check_success(self, release):
         self.latest_release = release
@@ -666,7 +731,7 @@ class ControlWindow(Gtk.ApplicationWindow):
         return GLib.SOURCE_REMOVE
 
     def _check_failed(self, message, manual):
-        self.check_button.set_sensitive(bool(self.repo))
+        self.check_button.set_sensitive(bool(self.repo or self.manifest_url))
         self.progress.set_fraction(0.0)
         self.progress.set_text(self._t('error'))
         self.update_status.set_text(message)
@@ -805,7 +870,7 @@ class ControlWindow(Gtk.ApplicationWindow):
         return GLib.SOURCE_REMOVE
 
     def _update_failed(self, message):
-        self.check_button.set_sensitive(bool(self.repo))
+        self.check_button.set_sensitive(bool(self.repo or self.manifest_url))
         self.update_button.set_sensitive(bool(self.latest_release))
         self.progress.set_fraction(0.0)
         self.progress.set_text(self._t('update_error'))

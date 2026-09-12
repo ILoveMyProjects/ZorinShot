@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "uuid": "zorin-shot@local",
+  "version": 7,
+  "version_name": "0.3.9",
+  "shell_versions": ["46"],
+  "download_url": "https://github.com/ILoveMyProjects/ZorinShot/releases/download/v0.3.9/zorin-shot-0.3.9.zip",
+  "sha256": "REPLACED_BY_GITHUB_ACTIONS",
+  "release_url": "https://github.com/ILoveMyProjects/ZorinShot/releases/tag/v0.3.9",
+  "changelog": [
+    "GitHub Actions builds and publishes the release package automatically.",
+    "The updater reads the stable update.json manifest and verifies SHA-256 before installation."
+  ]
+}

@@ -13,6 +13,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_REPO = 'ILoveMyProjects/ZorinShot'
+DEFAULT_BRANCH = 'master'
+UUID = 'zorin-shot@local'
 RUNTIME_ITEMS = [
     'app',
     'extension',
@@ -44,14 +46,8 @@ def detect_repo():
         ).strip()
     except Exception:
         return ''
-    patterns = [
-        r'github\.com[:/](?P<repo>[^/]+/[^/]+?)(?:\.git)?$',
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, url)
-        if match:
-            return match.group('repo').removesuffix('.git')
-    return ''
+    match = re.search(r'github\.com[:/](?P<repo>[^/]+/[^/]+?)(?:\.git)?$', url)
+    return match.group('repo').removesuffix('.git') if match else ''
 
 
 def changelog_for(version):
@@ -59,17 +55,28 @@ def changelog_for(version):
     start = re.search(rf'^## \[{re.escape(version)}\].*$', text, re.MULTILINE)
     if not start:
         return f'# Zorin Shot {version}\n\nBrak sekcji dla tej wersji w CHANGELOG.md.\n'
-    after = text[start.start():]
-    next_heading = re.search(r'^## \[', after[start.end() - start.start():], re.MULTILINE)
+    tail = text[start.start():]
+    next_heading = re.search(r'^## \[', tail[start.end() - start.start():], re.MULTILINE)
     if next_heading:
         end = start.end() + next_heading.start()
         return text[start.start():end].strip() + '\n'
-    return after.strip() + '\n'
+    return tail.strip() + '\n'
+
+
+def changelog_items(version):
+    section = changelog_for(version)
+    items = []
+    for raw in section.splitlines():
+        line = raw.strip()
+        if not line or line.startswith('#'):
+            continue
+        if line.startswith(('- ', '* ')):
+            items.append(line[2:].strip())
+    return items[:30]
 
 
 def validate_project(project_root):
-    py_files = list((project_root / 'app').glob('*.py'))
-    for path in py_files:
+    for path in (project_root / 'app').glob('*.py'):
         run([sys.executable, '-m', 'py_compile', str(path)], cwd=project_root)
 
     node = shutil.which('node')
@@ -92,7 +99,7 @@ def validate_project(project_root):
     else:
         print('warning: desktop-file-validate not found; desktop entry validation skipped')
 
-    schema_dir = project_root / 'extension' / 'zorin-shot@local' / 'schemas'
+    schema_dir = project_root / 'extension' / UUID / 'schemas'
     compiler = shutil.which('glib-compile-schemas')
     if compiler:
         run([compiler, '--strict', str(schema_dir)], cwd=project_root)
@@ -114,7 +121,6 @@ def create_zip(source_dir, zip_path, top_name):
             rel = path.relative_to(source_dir)
             arcname = Path(top_name) / rel
             info = zipfile.ZipInfo.from_file(path, str(arcname))
-            # Preserve executable bit for scripts when unpacked with common ZIP tools.
             if os.access(path, os.X_OK):
                 info.external_attr = (0o100755 << 16)
             with path.open('rb') as handle:
@@ -124,7 +130,9 @@ def create_zip(source_dir, zip_path, top_name):
 def main():
     parser = argparse.ArgumentParser(description='Build a GitHub-ready Zorin Shot release package')
     parser.add_argument('--version', default=read_version())
-    parser.add_argument('--repo', default=detect_repo() or DEFAULT_REPO, help='GitHub owner/repository; auto-detected in GitHub Actions')
+    parser.add_argument('--repo', default=detect_repo() or DEFAULT_REPO,
+                        help='GitHub owner/repository; auto-detected in GitHub Actions')
+    parser.add_argument('--default-branch', default=os.environ.get('DEFAULT_BRANCH', DEFAULT_BRANCH))
     parser.add_argument('--out', default=str(ROOT / 'dist'))
     args = parser.parse_args()
 
@@ -134,13 +142,17 @@ def main():
     if read_version() != version:
         raise SystemExit(f'VERSION contains {read_version()}, but build requested {version}')
     if not args.repo or '/' not in args.repo:
-        raise SystemExit('GitHub repository is required, e.g. OWNER/zorin-shot. In GitHub Actions it is detected automatically.')
+        raise SystemExit('GitHub repository is required, e.g. OWNER/ZorinShot.')
+    branch = args.default_branch.strip() or DEFAULT_BRANCH
 
     out_dir = Path(args.out).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
-    for old in out_dir.glob('zorin-shot-*.zip'):
-        old.unlink()
+    for pattern in ('zorin-shot-*.zip', 'SHA256SUMS', 'RELEASE_NOTES.md', 'update.json'):
+        for old in out_dir.glob(pattern):
+            if old.is_file():
+                old.unlink()
 
+    metadata_for_manifest = None
     with tempfile.TemporaryDirectory(prefix='zorin-shot-build-') as tmp:
         stage = Path(tmp) / 'runtime'
         stage.mkdir()
@@ -152,9 +164,12 @@ def main():
             else:
                 shutil.copy2(src, dst)
 
+        manifest_url = f'https://raw.githubusercontent.com/{args.repo}/{branch}/update.json'
         build_info = {
             'version': version,
             'github_repo': args.repo,
+            'default_branch': branch,
+            'update_manifest_url': manifest_url,
             'build_channel': 'github-release',
             'asset_pattern': 'zorin-shot-{version}.zip',
         }
@@ -163,10 +178,11 @@ def main():
         )
         (stage / 'VERSION').write_text(version + '\n', encoding='utf-8')
 
-        metadata_path = stage / 'extension' / 'zorin-shot@local' / 'metadata.json'
+        metadata_path = stage / 'extension' / UUID / 'metadata.json'
         metadata = json.loads(metadata_path.read_text(encoding='utf-8'))
         metadata['version-name'] = version
         metadata_path.write_text(json.dumps(metadata, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+        metadata_for_manifest = metadata
 
         validate_project(stage)
 
@@ -175,12 +191,32 @@ def main():
         create_zip(stage, zip_path, f'zorin-shot-{version}')
 
     digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
+    tag = f'v{version}'
+    download_url = f'https://github.com/{args.repo}/releases/download/{tag}/{zip_path.name}'
+    release_url = f'https://github.com/{args.repo}/releases/tag/{tag}'
+    manifest = {
+        'schema': 1,
+        'uuid': UUID,
+        'version': int(metadata_for_manifest.get('version') or 1),
+        'version_name': version,
+        'shell_versions': list(metadata_for_manifest.get('shell-version') or ['46']),
+        'download_url': download_url,
+        'sha256': digest,
+        'release_url': release_url,
+        'changelog': changelog_items(version),
+    }
+
     (out_dir / 'SHA256SUMS').write_text(f'{digest}  {zip_path.name}\n', encoding='utf-8')
     (out_dir / 'RELEASE_NOTES.md').write_text(changelog_for(version), encoding='utf-8')
+    (out_dir / 'update.json').write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8'
+    )
 
     print(f'Built: {zip_path}')
     print(f'SHA256: {digest}')
+    print(f'Update manifest: {out_dir / "update.json"}')
     print(f'GitHub repo embedded in updater: {args.repo}')
+    print(f'Update manifest URL embedded in app: https://raw.githubusercontent.com/{args.repo}/{branch}/update.json')
     return 0
 
 

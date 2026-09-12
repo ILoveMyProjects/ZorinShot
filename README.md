@@ -15,7 +15,7 @@ Zorin Shot to narzędzie do zrzutów ekranu przygotowane dla **Zorin OS 18 / GNO
   - **Ustawienia / Settings** — integracja, tryb przechwytywania, kursor, Print Screen i język;
   - **O programie / About** — opis, wersja i link do repozytorium;
   - **Aktualizacje / Updates** — aktualna/najnowsza wersja, changelog, ręczne sprawdzanie i instalacja aktualizacji.
-- Aktualizator pobiera publiczne wydania z GitHub Releases i przed instalacją sprawdza SHA-256 paczki.
+- Aktualizator najpierw czyta stabilny `update.json` z repozytorium, a jeśli manifest jest chwilowo niedostępny, używa GitHub Releases API jako fallback. Przed instalacją zawsze sprawdza SHA-256 paczki.
 
 ## Instalacja gotowego wydania
 
@@ -32,19 +32,47 @@ W domyślnym trybie `native` rozszerzenie otwiera `Main.screenshotUI` GNOME Shel
 
 ## Jak działa aktualizator
 
-Paczka budowana przez GitHub Actions zawiera w `app/build-info.json` nazwę **tego konkretnego repozytorium GitHub**. Nie trzeba wpisywać właściciela repo ręcznie.
+Paczka budowana przez GitHub Actions zawiera w `app/build-info.json` nazwę repozytorium `ILoveMyProjects/ZorinShot` oraz adres stabilnego manifestu:
 
-Aplikacja odpytuje endpoint `releases/latest`, odczytuje tag wersji i changelog z opisu wydania. Jeśli jest nowsza wersja, pobiera asset `zorin-shot-X.Y.Z.zip`, sprawdza jego SHA-256 i uruchamia instalator w trybie aktualizacji. Ustawienia użytkownika są zachowywane, poza jednorazową migracją trybu screenshotu w 0.2.0 do natywnego selektora GNOME.
+`https://raw.githubusercontent.com/ILoveMyProjects/ZorinShot/master/update.json`
+
+Po kliknięciu **Sprawdź aktualizacje** aplikacja najpierw pobiera ten manifest. `update.json` zawiera numer najnowszej wersji, changelog, bezpośredni URL assetu GitHub Release oraz SHA-256. Jeśli manifest jest niedostępny lub uszkodzony, updater automatycznie przechodzi na GitHub Releases API.
+
+Jeśli jest nowsza wersja, Zorin Shot pobiera `zorin-shot-X.Y.Z.zip`, sprawdza SHA-256, bezpiecznie rozpakowuje paczkę i uruchamia `install.sh --update --no-popup`. Ustawienia użytkownika są zachowywane.
 
 Repozytorium powinno być publiczne, jeśli aktualizacje mają działać bez tokena GitHub na komputerze użytkownika.
 
 ## Repozytorium i GitHub Actions
 
-Projekt jest gotowy do wrzucenia jako pojedyncze repozytorium. Workflow znajduje się w `.github/workflows/build-release.yml`.
+Workflow znajduje się w `.github/workflows/build-release.yml` i działa podobnie do mechanizmu używanego w `ZorinTinyResourceMonitor`.
 
-Na każdym pushu do `master` lub `main` GitHub Actions sprawdza składnię Pythona i JavaScript, waliduje schema GSettings, buduje ZIP, generuje `SHA256SUMS` i udostępnia wynik jako artifact workflow. Repozytorium docelowe to `ILoveMyProjects/ZorinShot`.
+Na każdym pushu do `master` lub `main` GitHub Actions:
 
-Po wypchnięciu tagu `vX.Y.Z`, zgodnego z plikiem `VERSION`, workflow dodatkowo tworzy GitHub Release i publikuje `zorin-shot-X.Y.Z.zip` oraz `SHA256SUMS`. Opis Release jest pobierany z odpowiedniej sekcji `CHANGELOG.md`; ten sam tekst pojawia się później w zakładce **Aktualizacje**.
+- sprawdza składnię Pythona i JavaScript;
+- waliduje schema GSettings i pliki `.desktop`;
+- buduje gotowy ZIP;
+- generuje `SHA256SUMS`;
+- generuje przyszły `update.json`;
+- publikuje wszystkie pliki jako artifact workflow.
+
+Po wypchnięciu tagu `vX.Y.Z`, zgodnego z plikiem `VERSION`, workflow dodatkowo:
+
+1. tworzy albo aktualizuje GitHub Release `vX.Y.Z`;
+2. wrzuca do Release `zorin-shot-X.Y.Z.zip` oraz `SHA256SUMS`;
+3. bierze changelog z odpowiedniej sekcji `CHANGELOG.md`;
+4. po utworzeniu Release zapisuje wygenerowany `update.json` na domyślnej gałęzi repozytorium.
+
+Dzięki temu użytkownik z wcześniejszą wersją może wejść w **Zorin Shot → Updates → Check for updates → Download and install update** i wykonać cały update bez terminala.
+
+### Wydanie nowej wersji
+
+1. Zmień `VERSION`, np. na `0.4.0`.
+2. Dodaj sekcję `## [0.4.0] - YYYY-MM-DD` w `CHANGELOG.md`.
+3. Wypchnij zmiany na `master`.
+4. Utwórz i wypchnij tag `v0.4.0`.
+5. Resztę wykonuje GitHub Actions.
+
+Workflow potrzebuje uprawnienia `contents: write`, które jest już zadeklarowane w pliku workflow. Jeśli ustawienia repozytorium blokują zapis przez `GITHUB_TOKEN`, w **Settings → Actions → General → Workflow permissions** ustaw **Read and write permissions**.
 
 ## Struktura
 
@@ -54,7 +82,9 @@ Po wypchnięciu tagu `vX.Y.Z`, zgodnego z plikiem `VERSION`, workflow dodatkowo 
 - `app/i18n.py` — tłumaczenia PL/EN;
 - `install.sh` — instalacja i tryb aktualizacji;
 - `uninstall.sh` — odinstalowanie;
-- `tools/build_release.py` — przygotowanie release ZIP;
+- `tools/build_release.py` — przygotowanie release ZIP, SHA-256 i `update.json`;
+- `package.sh` — lokalny build tej samej paczki;
+- `update.json.example` — przykład manifestu aktualizacji;
 - `.github/workflows/build-release.yml` — CI/release;
 - `VERSION` — wersja programu;
 - `CHANGELOG.md` — changelog używany również przez GitHub Release.

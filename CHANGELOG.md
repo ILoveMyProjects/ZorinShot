@@ -2,6 +2,23 @@
 
 Wszystkie istotne zmiany Zorin Shot są opisywane w tym pliku. Sekcja odpowiadająca tagowi wersji jest automatycznie używana jako opis GitHub Release i wyświetlana w zakładce **Aktualizacje** aplikacji.
 
+## [0.3.9] - 2026-09-12
+
+### Dodano
+- GitHub Actions generuje stabilny `update.json` z numerem wersji, bezpośrednim URL paczki, SHA-256, kompatybilnością GNOME 46 i changelogiem.
+- Po utworzeniu tagu `vX.Y.Z` workflow tworzy/aktualizuje GitHub Release, publikuje ZIP i `SHA256SUMS`, a następnie zapisuje `update.json` na domyślnej gałęzi.
+- Dodano `package.sh` do lokalnego zbudowania dokładnie tej samej paczki co w GitHub Actions.
+- Dodano `update.json.example` dokumentujący format manifestu.
+
+### Zmieniono
+- Updater Zorin Shot najpierw korzysta ze stabilnego `update.json`, podobnie jak ZorinTinyResourceMonitor.
+- GitHub Releases API pozostaje jako automatyczny fallback, jeśli manifest jest chwilowo niedostępny.
+- Paczka Release zawiera w `build-info.json` repozytorium, domyślną gałąź oraz adres manifestu aktualizacji.
+
+### Bezpieczeństwo
+- Updater wymaga prawidłowego SHA-256 z manifestu lub `SHA256SUMS` przed uruchomieniem instalatora.
+- Manifest jest walidowany pod kątem UUID, wersji, HTTPS i zgodności z GNOME Shell 46.
+
 ## [0.3.8] - 2026-09-12
 
 ### Naprawiono
