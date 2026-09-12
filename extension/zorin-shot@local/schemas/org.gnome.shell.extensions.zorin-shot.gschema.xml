@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.zorin-shot" path="/org/gnome/shell/extensions/zorin-shot/">
+    <key name="show-action-button" type="b">
+      <default>true</default>
+      <summary>Show a second screenshot button in Quick Settings</summary>
+    </key>
+    <key name="capture-mode" type="s">
+      <default>'region'</default>
+      <summary>Capture mode: region, full, or window</summary>
+    </key>
+    <key name="include-cursor" type="b">
+      <default>false</default>
+      <summary>Include pointer in screenshots</summary>
+    </key>
+    <key name="replace-print-screen" type="b">
+      <default>true</default>
+      <summary>Use Print Screen for Zorin Shot</summary>
+    </key>
+    <key name="capture-shortcut" type="as">
+      <default>['Print']</default>
+      <summary>Shortcut for Zorin Shot</summary>
+    </key>
+    <key name="native-fallback-shortcut" type="as">
+      <default>['&lt;Super&gt;Print']</default>
+      <summary>Shortcut for original GNOME screenshot UI while takeover is enabled</summary>
+    </key>
+    <key name="saved-native-shortcut" type="as">
+      <default>[]</default>
+      <summary>Saved original GNOME screenshot shortcut</summary>
+    </key>
+    <key name="saved-native-valid" type="b">
+      <default>false</default>
+      <summary>Whether the saved GNOME shortcut is valid</summary>
+    </key>
+    <key name="auto-check-updates" type="b">
+      <default>true</default>
+      <summary>Automatically check GitHub Releases for updates</summary>
+    </key>
+    <key name="last-update-check" type="x">
+      <default>0</default>
+      <summary>Unix timestamp of the last successful update check</summary>
+    </key>
+  </schema>
+</schemalist>

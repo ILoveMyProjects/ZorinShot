@@ -1,0 +1,11 @@
+{
+  "uuid": "zorin-shot@local",
+  "name": "Zorin Shot",
+  "description": "Native Zorin OS 18 / GNOME Shell 46 screenshot capture with Quick Settings integration and a built-in annotation editor.",
+  "shell-version": [
+    "46"
+  ],
+  "settings-schema": "org.gnome.shell.extensions.zorin-shot",
+  "version": 3,
+  "version-name": "0.1.0"
+}

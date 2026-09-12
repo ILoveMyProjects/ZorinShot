@@ -1,0 +1,6 @@
+{
+  "version": "0.1.0",
+  "github_repo": "",
+  "build_channel": "source",
+  "asset_pattern": "zorin-shot-{version}.zip"
+}

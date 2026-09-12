@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Zorin Shot Settings
+Name[pl]=Ustawienia Zorin Shot
+Exec="__ZORIN_SHOT_CONTROL__"
+Icon=zorin-shot
+Terminal=false
+NoDisplay=true

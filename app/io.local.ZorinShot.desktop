@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Zorin Shot
+Name[pl]=Zorin Shot
+Comment=Screenshot capture, annotations, settings and updates
+Comment[pl]=Zrzuty ekranu, adnotacje, ustawienia i aktualizacje
+Exec="__ZORIN_SHOT_CONTROL__"
+Icon=zorin-shot
+Terminal=false
+Categories=Graphics;Utility;Settings;
+Keywords=screenshot;screen shot;capture;annotation;update;zrzut;ekran;Zorin Shot;
+StartupNotify=true

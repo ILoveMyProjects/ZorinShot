@@ -1,0 +1,54 @@
+name: Build and release Zorin Shot
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build validators
+        run: sudo apt-get update && sudo apt-get install -y libglib2.0-bin nodejs
+
+      - name: Verify tag matches VERSION
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          expected="v$(tr -d '\n\r ' < VERSION)"
+          if [ "$GITHUB_REF_NAME" != "$expected" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match VERSION ($expected)."
+            exit 1
+          fi
+
+      - name: Build release package
+        run: python3 tools/build_release.py --repo "$GITHUB_REPOSITORY"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zorin-shot-${{ github.sha }}
+          path: |
+            dist/zorin-shot-*.zip
+            dist/SHA256SUMS
+            dist/RELEASE_NOTES.md
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist/zorin-shot-*.zip \
+            dist/SHA256SUMS \
+            --title "Zorin Shot $GITHUB_REF_NAME" \
+            --notes-file dist/RELEASE_NOTES.md
