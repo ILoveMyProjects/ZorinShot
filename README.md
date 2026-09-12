@@ -1,98 +1,128 @@
 # Zorin Shot
 
-Zorin Shot to narzędzie do zrzutów ekranu przygotowane dla **Zorin OS 18 / GNOME Shell 46**. Składa się z rozszerzenia GNOME Shell, własnego edytora GTK4 oraz aplikacji ustawień/aktualizacji.
+Zorin Shot is a screenshot tool for **Zorin OS 18 / GNOME Shell 46**. It consists of a GNOME Shell extension, a GTK4 annotation editor, and a settings/update application.
 
-## Funkcje
+## Features
 
-- Oryginalny przycisk aparatu GNOME pozostaje bez zmian i nadal obsługuje systemowy screenshot oraz nagrywanie ekranu.
-- Zorin Shot dodaje **drugi przycisk bezpośrednio obok oryginalnego przycisku screenshotu** w Quick Settings.
-- Kliknięcie Zorin Shot domyślnie otwiera **wbudowany selektor screenshotów GNOME**: obszar / okno / ekran. Po wykonaniu zrzutu obraz trafia automatycznie do edytora Zorin Shot.
-- `Print Screen` może uruchamiać Zorin Shot, a `Super + Print Screen` pozostaje dla oryginalnego panelu GNOME.
-- Opcjonalne tryby bez pytania: cały pulpit i aktywne okno.
-- Wbudowany edytor: pióro, marker, strzałka, prostokąt, elipsa, tekst, **całkowicie nieprzezroczysta cenzura**, kadrowanie, undo/redo, zoom, kopiowanie i zapis PNG.
-- Interfejs po polsku lub angielsku. Przy pierwszej instalacji język jest automatycznie wykrywany z ustawień systemu, a później można go ręcznie zmienić w Ustawieniach.
-- Aplikacja **Zorin Shot** ma zakładki:
-  - **Ustawienia / Settings** — integracja, tryb przechwytywania, kursor, Print Screen i język;
-  - **O programie / About** — opis, wersja i link do repozytorium;
-  - **Aktualizacje / Updates** — aktualna/najnowsza wersja, changelog, ręczne sprawdzanie i instalacja aktualizacji.
-- Aktualizator najpierw czyta stabilny `update.json` z repozytorium, a jeśli manifest jest chwilowo niedostępny, używa GitHub Releases API jako fallback. Przed instalacją zawsze sprawdza SHA-256 paczki.
+- Keeps the original GNOME screenshot button unchanged.
+- Adds a second **Zorin Shot** button next to the original screenshot button in Quick Settings.
+- Uses GNOME's native screenshot chooser for area, window, or screen capture.
+- Can assign `Print Screen` to Zorin Shot while keeping `Super + Print Screen` for the original GNOME screenshot / screen-recording panel.
+- Includes optional direct full-desktop and active-window capture modes.
+- Built-in editor with pen, translucent highlighter, line, arrow, rectangle, ellipse, text, numbered markers, pixelated redaction, crop, move, undo/redo, zoom, clipboard copy, and PNG save.
+- Light, dark, and system themes.
+- Polish and English application UI. On first installation the language is detected from the desktop locale; it can be changed later in Zorin Shot Settings.
+- Built-in update checker and installer with SHA-256 validation.
 
-## Instalacja gotowego wydania
+## Installation
 
-1. Pobierz `zorin-shot-X.Y.Z.zip` z GitHub Releases.
-2. Rozpakuj paczkę.
-3. Uruchom `install.sh`.
-4. Instalator pokaże popup z prośbą o wylogowanie i ponowne zalogowanie. Nie trzeba później wpisywać `gnome-extensions enable` ani `gnome-extensions prefs`.
+1. Download `zorin-shot-X.Y.Z.zip` from GitHub Releases.
+2. Extract the archive.
+3. Run `install.sh`.
+4. Log out and sign back in so GNOME Shell can load the extension.
 
-Po pierwszym ponownym logowaniu aplikacja Zorin Shot otworzy się automatycznie. Później uruchamia się ją normalnie z menu aplikacji.
+A fresh installation enables the extension for the next login and opens the Zorin Shot settings application once after signing back in. No additional `gnome-extensions enable` or `gnome-extensions prefs` command is required.
 
-## Jak działa screenshot
+## Screenshot workflow
 
-W domyślnym trybie `native` rozszerzenie otwiera `Main.screenshotUI` GNOME Shell 46 i wymusza start w trybie **Obszar**. Quick Settings nie jest zamykane przed otwarciem selektora: GNOME najpierw zamraża aktualny stage, a dopiero potem zamyka popupy, więc na zamrożonym obrazie może pozostać otwarte menu. Po wykonaniu zrzutu Zorin Shot odbiera sygnał `screenshot-taken` i otwiera gotowy PNG we własnym edytorze.
+The default `native` capture mode opens `Main.screenshotUI` from GNOME Shell 46 and starts in area-selection mode. Zorin Shot does not close Quick Settings before GNOME freezes the current stage, which allows open shell menus to remain visible in the captured scene. After GNOME emits `screenshot-taken`, the resulting PNG is opened directly in the Zorin Shot editor.
 
-## Jak działa aktualizator
+## Application language
 
-Paczka budowana przez GitHub Actions zawiera w `app/build-info.json` nazwę repozytorium `ILoveMyProjects/ZorinShot` oraz adres stabilnego manifestu:
+Repository documentation is maintained in English. The application itself supports:
+
+- English
+- Polish
+
+On first installation, Zorin Shot detects the system locale. The language can later be changed in **Zorin Shot → Settings → Language**. The editor and settings window use the selected application language.
+
+## Updates
+
+Release builds contain repository and update-manifest information in `app/build-info.json`.
+
+The updater first downloads the stable manifest:
 
 `https://raw.githubusercontent.com/ILoveMyProjects/ZorinShot/master/update.json`
 
-Po kliknięciu **Sprawdź aktualizacje** aplikacja najpierw pobiera ten manifest. `update.json` zawiera numer najnowszej wersji, changelog, bezpośredni URL assetu GitHub Release oraz SHA-256. Jeśli manifest jest niedostępny lub uszkodzony, updater automatycznie przechodzi na GitHub Releases API.
+The manifest contains:
 
-Jeśli jest nowsza wersja, Zorin Shot pobiera `zorin-shot-X.Y.Z.zip`, sprawdza SHA-256, bezpiecznie rozpakowuje paczkę i uruchamia `install.sh --update --no-popup`. Ustawienia użytkownika są zachowywane.
+- version number;
+- supported GNOME Shell versions;
+- direct GitHub Release asset URL;
+- SHA-256 checksum;
+- GitHub Release URL;
+- release changelog.
 
-Repozytorium powinno być publiczne, jeśli aktualizacje mają działać bez tokena GitHub na komputerze użytkownika.
+If the manifest cannot be read, the application automatically falls back to the GitHub Releases API.
 
-## Repozytorium i GitHub Actions
+When a newer version is available, **Zorin Shot → Updates → Download and install update** downloads the ZIP, verifies SHA-256, extracts it safely, and runs `install.sh --update --no-popup`. User preferences are preserved.
 
-Workflow znajduje się w `.github/workflows/build-release.yml` i działa podobnie do mechanizmu używanego w `ZorinTinyResourceMonitor`.
+## GitHub Actions release pipeline
 
-Na każdym pushu do `master` lub `main` GitHub Actions:
+The workflow is stored in `.github/workflows/build-release.yml`.
 
-- sprawdza składnię Pythona i JavaScript;
-- waliduje schema GSettings i pliki `.desktop`;
-- buduje gotowy ZIP;
-- generuje `SHA256SUMS`;
-- generuje przyszły `update.json`;
-- publikuje wszystkie pliki jako artifact workflow.
+A regular push to `master` or `main` validates and builds the project. A version tag such as `v0.3.10` additionally:
 
-Po wypchnięciu tagu `vX.Y.Z`, zgodnego z plikiem `VERSION`, workflow dodatkowo:
+1. verifies that the tag matches `VERSION`;
+2. builds `zorin-shot-X.Y.Z.zip`;
+3. generates `SHA256SUMS`;
+4. generates `RELEASE_NOTES.md`;
+5. generates `update.json`;
+6. creates or updates the GitHub Release;
+7. uploads the ZIP and checksum to the Release;
+8. writes the stable `update.json` back to the repository's default branch.
 
-1. tworzy albo aktualizuje GitHub Release `vX.Y.Z`;
-2. wrzuca do Release `zorin-shot-X.Y.Z.zip` oraz `SHA256SUMS`;
-3. bierze changelog z odpowiedniej sekcji `CHANGELOG.md`;
-4. po utworzeniu Release zapisuje wygenerowany `update.json` na domyślnej gałęzi repozytorium.
+The workflow uses current Node.js 24-compatible GitHub Actions majors to avoid the Node.js 20 deprecation warning on GitHub-hosted runners.
 
-Dzięki temu użytkownik z wcześniejszą wersją może wejść w **Zorin Shot → Updates → Check for updates → Download and install update** i wykonać cały update bez terminala.
+The repository needs **Actions → Workflow permissions → Read and write permissions** so `GITHUB_TOKEN` can update `update.json` on the default branch.
 
-### Wydanie nowej wersji
+## Releasing a new version
 
-1. Zmień `VERSION`, np. na `0.4.0`.
-2. Dodaj sekcję `## [0.4.0] - YYYY-MM-DD` w `CHANGELOG.md`.
-3. Wypchnij zmiany na `master`.
-4. Utwórz i wypchnij tag `v0.4.0`.
-5. Resztę wykonuje GitHub Actions.
+1. Update `VERSION`.
+2. Add a matching section to `CHANGELOG.md`.
+3. Push the changes to `master`.
+4. Create and push the matching tag, for example:
 
-Workflow potrzebuje uprawnienia `contents: write`, które jest już zadeklarowane w pliku workflow. Jeśli ustawienia repozytorium blokują zapis przez `GITHUB_TOKEN`, w **Settings → Actions → General → Workflow permissions** ustaw **Read and write permissions**.
+```bash
+git tag v0.3.10
+git push origin v0.3.10
+```
 
-## Struktura
+GitHub Actions handles the remaining release steps.
 
-- `extension/zorin-shot@local/` — rozszerzenie GNOME Shell 46;
-- `app/zorin-shot-editor.py` — edytor adnotacji;
-- `app/zorin-shot-control.py` — Ustawienia / O programie / Aktualizacje;
-- `app/i18n.py` — tłumaczenia PL/EN;
-- `install.sh` — instalacja i tryb aktualizacji;
-- `uninstall.sh` — odinstalowanie;
-- `tools/build_release.py` — przygotowanie release ZIP, SHA-256 i `update.json`;
-- `package.sh` — lokalny build tej samej paczki;
-- `update.json.example` — przykład manifestu aktualizacji;
-- `.github/workflows/build-release.yml` — CI/release;
-- `VERSION` — wersja programu;
-- `CHANGELOG.md` — changelog używany również przez GitHub Release.
+## Local release build
 
-## Zależności na Zorin OS 18
+Run:
 
-Instalator sprawdza Python 3, PyGObject, Cairo i GTK4. Jeśli bibliotek brakuje, wyświetla informację o wymaganych pakietach.
+```bash
+./package.sh
+```
 
-## Odinstalowanie
+This uses the same release builder as GitHub Actions and creates the ZIP, checksum, release notes, and update manifest in `dist/`.
 
-Uruchom `uninstall.sh` z rozpakowanej paczki projektu/wydania.
+## Project structure
+
+- `extension/zorin-shot@local/` — GNOME Shell 46 extension.
+- `app/zorin-shot-editor.py` — annotation editor.
+- `app/zorin-shot-control.py` — Settings / About / Updates application.
+- `app/i18n.py` — English and Polish UI strings.
+- `install.sh` — installer and update installer.
+- `uninstall.sh` — uninstaller.
+- `tools/build_release.py` — release ZIP, SHA-256 and update-manifest builder.
+- `package.sh` — local release build helper.
+- `update.json.example` — update-manifest example.
+- `.github/workflows/build-release.yml` — CI and release workflow.
+- `VERSION` — application version.
+- `CHANGELOG.md` — release changelog and GitHub Release notes source.
+
+## Runtime dependencies
+
+The installer checks for Python 3, PyGObject, Cairo and GTK4. On Zorin OS 18 the required packages can be installed with:
+
+```bash
+sudo apt install python3-gi python3-cairo gir1.2-gtk-4.0
+```
+
+## Uninstallation
+
+Run `uninstall.sh` from an extracted project or release package.

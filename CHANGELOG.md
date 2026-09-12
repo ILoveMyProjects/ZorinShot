@@ -1,173 +1,183 @@
 # Changelog
 
-Wszystkie istotne zmiany Zorin Shot są opisywane w tym pliku. Sekcja odpowiadająca tagowi wersji jest automatycznie używana jako opis GitHub Release i wyświetlana w zakładce **Aktualizacje** aplikacji.
+All notable Zorin Shot changes are documented here. The section matching a release tag is automatically used as the GitHub Release description and is displayed in the application's **Updates** tab.
+
+## [0.3.10] - 2026-09-12
+
+### Added
+- The update manifest now includes the full Markdown changelog in `changelog_markdown` while keeping the compact changelog list for backward compatibility.
+- The Updates tab renders release notes as formatted text with headings, bullets, bold text and inline code instead of showing raw Markdown syntax.
+
+### Changed
+- `README.md`, `TESTING.md`, and the repository changelog are maintained in English. The application UI itself remains localized independently and still follows the detected/selected English or Polish language.
+- The changelog panel in the Updates tab now expands vertically with the window instead of leaving unused space below it.
+- GitHub Actions now uses Node.js 24-compatible action majors (`actions/checkout@v7` and `actions/upload-artifact@v7`).
+
+### Fixed
+- Removed the GitHub Actions Node.js 20 deprecation warning caused by older `checkout` and `upload-artifact` action majors.
 
 ## [0.3.9] - 2026-09-12
 
-### Dodano
-- GitHub Actions generuje stabilny `update.json` z numerem wersji, bezpośrednim URL paczki, SHA-256, kompatybilnością GNOME 46 i changelogiem.
-- Po utworzeniu tagu `vX.Y.Z` workflow tworzy/aktualizuje GitHub Release, publikuje ZIP i `SHA256SUMS`, a następnie zapisuje `update.json` na domyślnej gałęzi.
-- Dodano `package.sh` do lokalnego zbudowania dokładnie tej samej paczki co w GitHub Actions.
-- Dodano `update.json.example` dokumentujący format manifestu.
+### Added
+- GitHub Actions generates a stable `update.json` with the version, direct package URL, SHA-256, GNOME 46 compatibility and changelog data.
+- A `vX.Y.Z` tag creates or updates the GitHub Release, publishes the ZIP and `SHA256SUMS`, and then writes `update.json` to the default branch.
+- Added `package.sh` to build the same release package locally as GitHub Actions.
+- Added `update.json.example` documenting the update-manifest format.
 
-### Zmieniono
-- Updater Zorin Shot najpierw korzysta ze stabilnego `update.json`, podobnie jak ZorinTinyResourceMonitor.
-- GitHub Releases API pozostaje jako automatyczny fallback, jeśli manifest jest chwilowo niedostępny.
-- Paczka Release zawiera w `build-info.json` repozytorium, domyślną gałąź oraz adres manifestu aktualizacji.
+### Changed
+- The updater checks stable `update.json` first, following the same model as ZorinTinyResourceMonitor.
+- GitHub Releases API remains an automatic fallback when the manifest is temporarily unavailable.
+- Release packages embed the repository, default branch and manifest URL in `build-info.json`.
 
-### Bezpieczeństwo
-- Updater wymaga prawidłowego SHA-256 z manifestu lub `SHA256SUMS` przed uruchomieniem instalatora.
-- Manifest jest walidowany pod kątem UUID, wersji, HTTPS i zgodności z GNOME Shell 46.
+### Security
+- The updater requires a valid SHA-256 from the manifest or `SHA256SUMS` before launching the installer.
+- The manifest is validated for UUID, version, HTTPS URL and GNOME Shell 46 compatibility.
 
 ## [0.3.8] - 2026-09-12
 
-### Naprawiono
-- Usunięto błędne powiązanie pionowej pozycji prawego panelu z pionowym wycentrowaniem obrazu. **Tools / Tool options / Elements / Image details** są teraz zakotwiczone u góry sidebara od pierwszej klatki, niezależnie od rozmiaru screenshotu i poziomu zoomu.
-- Naprawiono opóźnione pojawianie się prawego panelu po otwarciu edytora.
-- Mały, wycentrowany screenshot nie przesuwa już panelu Tools na środek okna; powiększanie obrazu nie zmienia pionowej pozycji sidebara.
+### Fixed
+- Removed the incorrect coupling between the right sidebar position and the vertically centered screenshot. **Tools / Tool options / Elements / Image details** are anchored at the top of the sidebar from the first frame, regardless of screenshot size or zoom.
+- Fixed delayed sidebar appearance when opening the editor.
+- A small centered screenshot no longer moves Tools toward the center of the window; zooming no longer changes the sidebar's vertical position.
 
 ## [0.3.7] - 2026-09-12
 
-### Naprawiono
-- Prawy panel nie ma już stałej sztucznej przerwy 18 px u góry. Początek sekcji **Tools** jest dynamicznie synchronizowany z faktyczną górną krawędzią wycentrowanego obrazu.
-- Ujednolicono tło całej prawej kolumny, włącznie z viewportem przewijania i obszarem pod nagłówkami sekcji. Nie ma już dwóch różnych odcieni pod `Tools`, `Tool options`, `Elements` i `Image details`.
-- Nagłówki sekcji mają przezroczyste tło i dziedziczą dokładnie ten sam kolor co reszta sidebara.
+### Fixed
+- Removed the artificial 18 px top gap from the right panel.
+- Unified the entire right-column background, including its scroll viewport and the space underneath section headings.
+- Section headings use a transparent background and inherit the same sidebar color.
 
 ## [0.3.6] - 2026-09-12
 
-### Zmieniono
-- Okno potwierdzenia zamknięcia ma teraz wycentrowany układ: ikonę, pytanie, opis, checkbox **Nie pytaj ponownie** i trzy równe przyciski na środku.
-- Przyciski zamknięcia są czytelnie rozróżnione: **Anuluj**, **Kopiuj i zamknij** oraz **Zamknij**.
+### Changed
+- The close-confirmation dialog now centers its icon, question, description, **Do not ask again** checkbox and three action buttons.
+- Close actions are clearly separated into **Cancel**, **Copy and close**, and **Close**.
 
-### Naprawiono
-- Przywrócono pionowe i poziome centrowanie obrazu w obszarze roboczym, tak jak przed zmianą z wersji 0.3.5.
+### Fixed
+- Restored vertical and horizontal image centering in the workspace.
 
 ## [0.3.5] - 2026-09-12
 
-### Naprawiono
-- Naprawiono przycisk **Fit / Dopasuj**: przy każdym użyciu ponownie odczytuje rzeczywisty rozmiar viewportu po zmianie rozmiaru lub maksymalizacji okna.
-- Obraz jest teraz wyrównany od góry do tej samej linii co panel **Tools**, zamiast zmieniać pionowe położenie przez centrowanie.
+### Fixed
+- Fixed **Fit** so it re-reads the actual viewport size after window resize or maximization.
 
-### Dodano
-- **Ctrl + kółko myszy** nad obrazem powiększa i pomniejsza zoom.
+### Added
+- **Ctrl + mouse wheel** zoom over the image.
 
-### Zmieniono
-- Nagłówki **Tools**, **Tool options**, **Elements** i **Image details** nie są już częścią obramowanej karty. Są zwykłymi nagłówkami z paddingiem, a ramka obejmuje tylko zawartość sekcji.
-- Usunięto ciemniejszy pasek/tło bezpośrednio pod nagłówkami sekcji.
-- Prawy panel i górna krawędź obrazu zaczynają się na tej samej wysokości.
-- Tool Options pozostaje dynamiczne i używa naturalnej wysokości aktywnych opcji.
+### Changed
+- **Tools**, **Tool options**, **Elements**, and **Image details** headings are outside their bordered content cards.
+- Removed the darker strip directly behind section headings.
+- Tool Options uses only the natural height required by the active tool.
 
 ## [0.3.4] - 2026-09-12
 
-### Naprawiono
-- Komunikat instalacyjny / welcome popup korzysta teraz z wykrytego języka systemu: angielski system dostaje komunikaty po angielsku, polski po polsku.
-- Usunięto białe linie łączące kolejne znaczniki **Number**. Przyczyną był pozostający w Cairo aktywny path pomiędzy kolejnymi okręgami; każda adnotacja ma teraz izolowaną ścieżkę rysowania.
-- Motyw **Ciemny / Jasny / Systemowy** działa również w samym edytorze i zmienia się na żywo, gdy ustawienie zostanie przełączone w centrum Zorin Shot.
-- Dodano poprawny padding i wspólne karty dla sekcji **Tools**, **Tool Options**, **Elements** i **Image details**, aby nagłówki nie dotykały krawędzi sekcji.
+### Fixed
+- First-install / welcome messages now use the detected system language: English desktop gets English messages and Polish desktop gets Polish messages.
+- Removed white lines connecting consecutive **Number** markers by isolating Cairo paths between annotations.
+- **Dark / Light / System** theme selection now applies to the editor as well as the settings window and updates live.
+- Added consistent spacing around Tools, Tool Options, Elements and Image details.
 
-### Zmieniono
-- **Pióro** jest teraz pierwszym narzędziem na liście i domyślnie aktywnym po otwarciu edytora.
-- Sidebar w ciemnym motywie korzysta z ciemniejszych kolorów, a obszar roboczy i karty są spójne z wybranym motywem.
+### Changed
+- **Pen** is the first tool and the default active tool when the editor opens.
+- The dark theme uses a darker Zorin-like sidebar and workspace treatment.
 
 ## [0.3.3] - 2026-09-12
 
-### Zmieniono
-- **Tools** zawiera teraz wyłącznie kompaktowe ikony bez napisów; są rozmiarem zbliżone do ikon z górnego paska, a nazwa narzędzia jest dostępna w tooltipie.
-- Dodano własny, spójny zestaw ikon symbolicznych dla narzędzi Zorin Shot zamiast dużych znaków tekstowych/emoji.
-- Górny pasek został uporządkowany w grupy: historia/edycja → zoom → kopiowanie/zapis.
-- Ciemny motyw używa teraz ciemnego obszaru roboczego i sidebara bardziej zbliżonego kolorystycznie do Zorin Dark; jasny motyw zachowuje jasne tło.
-- **Tool Options** ma niejednorodny, dynamiczny rozmiar i zajmuje tylko tyle wysokości, ile potrzebuje aktualne narzędzie.
-- **Elements** rośnie wraz z zawartością tylko do ustalonego maksimum, po czym automatycznie przechodzi w przewijaną listę.
+### Changed
+- Tools now contains compact icon-only buttons with tooltips.
+- Added a consistent symbolic icon set for Zorin Shot tools.
+- Reordered the top toolbar into edit/history → zoom → copy/save groups.
+- Tool Options is dynamic and occupies only the height required by the current tool.
+- Elements grows with content up to a limit and then becomes scrollable.
 
-### Dodano
-- Przycisk **Ustawienia** w pasku tytułu edytora, bezpośrednio obok systemowych przycisków okna; otwiera to samo centrum Zorin Shot co ikona aplikacji w menu programów.
-- Podczas kadrowania wyświetlana jest wyraźna **przerywana ramka** oraz przyciemnienie obszaru, który zostanie odcięty.
+### Added
+- Added a Settings button to the editor title bar that opens the same Zorin Shot control center as the application-menu entry.
+- Crop preview now shows a visible dashed border and dims the area that will be discarded.
 
-### Naprawiono
-- Dodatkowo odcięto gest rysowania dla narzędzia **Numer**, aby między kolejnymi numerami nie mogła powstać żadna przypadkowa kreska.
-- Ustabilizowano układ prawej kolumny, tak aby zmiana opcji narzędzia nie odsuwała niepotrzebnie sekcji **Elements** i **Image details**.
+### Fixed
+- Disabled drawing drag for **Number** so it cannot create an accidental line between markers.
+- Stabilized right-column layout when tool options change.
 
 ## [0.3.2] - 2026-09-12
 
-### Dodano
-- Nowy wybór motywu aplikacji: **Systemowy / Ciemny / Jasny**.
-- Ulepszony wygląd edytora z większymi ikonami narzędzi oraz ciemniejszym sidebarem w stylu zbliżonym do dark Zorin.
+### Added
+- Added **System / Dark / Light** application theme selection.
+- Improved the editor sidebar and tool presentation.
 
-### Zmieniono
-- Panel narzędzi został wizualnie dopracowany: większe symbole, czytelniejsze kafelki i bardziej nowoczesny układ.
-- Sekcja **Opcje narzędzia** jest osadzona bardziej kompaktowo, aby nie tworzyć niepotrzebnych dużych pustych przestrzeni.
-- Okno ustawień także respektuje wybrany motyw aplikacji.
+### Changed
+- Improved tool-button layout and reduced unnecessary Tool Options whitespace.
+- The settings window also respects the selected application theme.
 
-### Naprawiono
-- Naprawiono błąd narzędzia **Numer**, w którym między kolejnymi numerami pojawiała się niechciana kreska.
-- Ustabilizowano dalsze zachowanie prawego panelu podczas pracy narzędziami.
+### Fixed
+- Fixed an issue where the Number tool could create an unwanted connecting line.
+- Improved right-panel stability.
 
 ## [0.3.1] - 2026-09-12
 
-### Zmieniono
-- Górny pasek edytora używa teraz samych ikon dla: cofnij, ponów, usuń, pomniejsz, powiększ, dopasuj, kopiuj i zapisz.
-- Prawa kolumna została ustabilizowana: zawiera tylko **Narzędzia**, **Opcje narzędzia**, **Elementy** i **Szczegóły obrazu**.
-- Sekcja **Elementy** ma własny scroll, więc przy większej liczbie adnotacji okno aplikacji nie rozszerza się i obszar obrazu nie zmienia położenia.
-- Przy zamykaniu okna pojawia się dialog z opcjami **Anuluj**, **Kopiuj i zamknij** oraz **Zamknij**, a także checkbox **Nie pytaj ponownie**.
+### Changed
+- The top editor toolbar uses icons for undo, redo, delete, zoom out, zoom in, fit, copy and save.
+- The right column contains only Tools, Tool Options, Elements and Image details.
+- Elements has its own scroll area so additional annotations do not enlarge the application window or move the image workspace.
+- Closing the editor shows **Cancel**, **Copy and close**, **Close**, and a **Do not ask again** checkbox.
 
-### Naprawiono
-- Usunięto problem z niestabilnym układem, przez który po zmianach po prawej stronie przesuwał się cały obszar obrazu.
-- Poprawiono zachowanie prawego panelu tak, aby nie znikał podczas przełączania narzędzi.
-- Poprawiono obsługę listy elementów i zaznaczenia aktywnej adnotacji.
+### Fixed
+- Fixed layout shifts caused by changes in the right panel.
+- Fixed the right panel disappearing while switching tools.
+- Improved active-annotation selection in the Elements list.
 
 ## [0.3.0] - 2026-09-12
 
-### Dodano
-- Przebudowany edytor z układem zbliżonym do referencji: duży obszar obrazu po lewej i prawy panel opcji.
-- Nowe narzędzia: **Linia**, **Przesuń** (zaznaczanie i przesuwanie elementów) oraz **Numer** do wstawiania kolejnych oznaczeń 1, 2, 3… w kołach.
-- Lista elementów po prawej z wyborem aktywnej adnotacji oraz przyciskami usuwania i zmiany kolejności.
-- Panel **Szczegóły obrazu** z nazwą pliku, rozmiarem, zoomem i liczbą adnotacji.
-- Osobne opcje dla narzędzi: grubość, kolor, przezroczystość, wypełnienie, tło tekstu, promień numerów i rozmiar pikseli cenzury.
+### Added
+- Rebuilt the editor around a large image workspace with a right-side options panel.
+- Added **Line**, **Move**, and sequential **Number** tools.
+- Added an Elements list with selection, deletion and ordering controls.
+- Added Image details with file name, image dimensions, zoom and annotation count.
+- Added per-tool controls for thickness, color, opacity, fill, text background, number radius and redaction pixel size.
 
-### Zmieniono
-- Obraz automatycznie dopasowuje się do rozmiaru okna i rośnie wraz z powiększaniem okna; nadal dostępne są ręczne przyciski zoomu i dopasowania.
-- Marker używa półprzezroczystego koloru, dzięki czemu tło pozostaje widoczne.
-- Cenzura działa teraz jako pikselizacja w kwadratowe bloki zamiast prostego przyciemnienia.
-- Tekst i numerowane znaczniki mogą mieć własne tło / wypełnienie z kolorem i przezroczystością.
+### Changed
+- The image automatically fits the current window while manual zoom remains available.
+- Highlighter uses translucent ink so the image remains visible below it.
+- Redaction uses square pixelation blocks.
+- Text and numbered markers support configurable backgrounds/fills and opacity.
 
 ## [0.2.1] - 2026-09-12
 
-### Naprawiono
-- Drugi przycisk Quick Settings jest teraz odnajdywany przez rzeczywisty `SystemItem` GNOME 46 (`quickSettingsItems` / grid), a nie tylko przez prywatne pole; Zorin Shot ponawia wstawienie także przy każdym otwarciu Quick Settings.
-- Usunięto popup „nie znaleziono paska akcji Quick Settings”; jeśli Zorin Taskbar przebuduje menu później, rozszerzenie czeka i ponawia integrację.
-- Natywny selektor screenshotu zawsze startuje w trybie **Obszar**, zamiast zapamiętanego wcześniej trybu pełnego ekranu.
-- Zorin Shot nie zamyka Quick Settings przed zamrożeniem obrazu. GNOME 46 najpierw przechwytuje aktualny stage, a dopiero później zamyka popupy, dzięki czemu można zaznaczyć fragment zawierający otwarte menu.
-- Okno Zorin Shot używa teraz `Gtk.Window.set_titlebar()` zamiast wkładać `Gtk.HeaderBar` do treści, co usuwa podwójny pasek tytułu i podwójne przyciski minimalizuj/maksymalizuj/zamknij.
-- Ikony aplikacji są instalowane także pod nazwami odpowiadającymi Application ID, aby GTK4/GNOME poprawnie kojarzył okna z ikoną Zorin Shot.
-- Usunięto stary dodatkowy plik `zorin-shot-settings.desktop`, który nie jest już potrzebny.
-- Pierwszy język jest wykrywany z `LANGUAGE` / `LC_*` / `LANG`: polski dla systemu PL, angielski dla systemu EN i pozostałych. Użytkownik nadal może później ręcznie przełączyć Polski/English.
-- Lokalna paczka i updater są teraz na stałe powiązane z `ILoveMyProjects/ZorinShot`.
-- GitHub Actions buduje zarówno z gałęzi `master`, jak i `main`.
+### Fixed
+- Improved GNOME 46 Quick Settings button discovery and reinsertion when Zorin Taskbar rebuilds the menu.
+- Removed the user-facing “Quick Settings action bar not found” notification and switched to silent retries.
+- GNOME's native screenshot UI now starts in **Area** mode.
+- Zorin Shot does not close Quick Settings before GNOME freezes the stage, so open shell menus can remain visible in the captured scene.
+- Fixed the duplicate title bar by using `Gtk.Window.set_titlebar()` correctly.
+- Installed application-ID icon aliases so GTK4/GNOME associates windows with the Zorin Shot icon.
+- Removed the obsolete `zorin-shot-settings.desktop` entry.
+- Initial language is detected from `LANGUAGE`, `LC_*`, and `LANG`.
+- Bound the updater to `ILoveMyProjects/ZorinShot`.
+- GitHub Actions builds from both `master` and `main`.
 
 ## [0.2.0] - 2026-09-12
 
-### Naprawiono
-- Dodawanie przycisku Zorin Shot do właściwego paska akcji Quick Settings w GNOME Shell 46; przycisk jest wstawiany bezpośrednio po oryginalnym przycisku zrzutu ekranu. Dodano również awaryjne wyszukiwanie oryginalnego przycisku w drzewie Quick Settings dla zmodyfikowanych buildów Zorin.
-- Domyślny screenshot Zorin Shot otwiera teraz **natywny selektor GNOME** — obszar / okno / ekran — zamiast najpierw otwierać w edytorze obraz całego pulpitu.
-- Po zakończeniu wyboru w natywnym selektorze GNOME wynik jest automatycznie przekazywany do edytora Zorin Shot.
-- Cenzura jest teraz w 100% nieprzezroczysta i całkowicie zasłania wskazany obszar.
-- Identyfikatory aplikacji i plików `.desktop` zostały rozdzielone i dopasowane (`io.local.ZorinShot.Control` / `io.local.ZorinShot.Editor`), aby GNOME poprawnie wiązał okna z ikoną Zorin Shot zamiast ikony zastępczej.
-- Instalator instaluje zarówno zwykłą, jak i symboliczną ikonę Zorin Shot oraz odświeża cache ikon.
+### Fixed
+- Added the Zorin Shot action directly after the original GNOME screenshot button in the GNOME Shell 46 system action row.
+- Default capture now opens GNOME's native area/window/screen chooser instead of opening a full-desktop image first.
+- The native chooser result is sent automatically to the Zorin Shot editor.
+- Redaction is fully opaque.
+- Matched application IDs and `.desktop` filenames for correct GNOME window/icon association.
+- Installer now deploys both regular and symbolic Zorin Shot icons and refreshes the icon cache.
 
-### Dodano
-- Wybór języka **Polski / English** w Ustawieniach Zorin Shot.
-- Tłumaczenia centrum Zorin Shot, edytora oraz komunikatów rozszerzenia.
-- Migrację starszego trybu przechwytywania do natywnego selektora GNOME podczas aktualizacji do 0.2.0.
+### Added
+- Added **Polish / English** language selection.
+- Added translations for the control center, editor and extension messages.
+- Added migration from the older capture mode to GNOME's native chooser.
 
 ## [0.1.0] - 2026-09-12
 
-### Dodano
-- Własny przycisk Zorin Shot obok oryginalnego przycisku zrzutu ekranu GNOME.
-- Przechwytywanie aktualnego stanu powłoki przed otwarciem edytora.
-- Tryby: obszar, cały widoczny pulpit i aktywne okno.
-- Wbudowany edytor: pióro, marker, strzałka, prostokąt, elipsa, tekst, cenzura, kadrowanie, undo/redo, zoom, kopiowanie i zapis PNG.
-- Przejęcie `Print Screen` przez Zorin Shot z pozostawieniem oryginalnego panelu GNOME pod `Super + Print Screen`.
-- Centrum Zorin Shot z zakładkami **Ustawienia**, **O programie** i **Aktualizacje**.
-- Sprawdzanie najnowszej wersji z GitHub Releases, wyświetlanie changelogu i aktualizacja bez wpisywania poleceń w terminalu.
-- Walidacja SHA-256 pobranej paczki aktualizacji.
-- Automatyczne budowanie paczki w GitHub Actions i publikowanie jej przy tagach `vX.Y.Z`.
+### Added
+- Added a separate Zorin Shot button next to GNOME's original screenshot button.
+- Added capture of the current shell state before opening the editor.
+- Added area, full desktop and active-window modes.
+- Added a built-in annotation editor with pen, highlighter, arrow, shapes, text, redaction, crop, undo/redo, zoom, clipboard copy and PNG save.
+- Added optional `Print Screen` takeover while keeping the original GNOME panel on `Super + Print Screen`.
+- Added the Zorin Shot control center with **Settings**, **About**, and **Updates** tabs.
+- Added GitHub Release update checks, changelog display and terminal-free update installation.
+- Added SHA-256 verification for downloaded update packages.
+- Added GitHub Actions release-package generation and publishing for `vX.Y.Z` tags.

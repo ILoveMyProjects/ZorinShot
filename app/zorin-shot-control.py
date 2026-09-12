@@ -18,7 +18,8 @@ from pathlib import Path
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
-from gi.repository import Gtk, Gdk, Gio, GLib
+gi.require_version('Pango', '1.0')
+from gi.repository import Gtk, Gdk, Gio, GLib, Pango
 
 from i18n import tr
 
@@ -227,7 +228,11 @@ class ControlWindow(Gtk.ApplicationWindow):
     def _page_scroller(self):
         scroll = Gtk.ScrolledWindow()
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_hexpand(True)
+        scroll.set_vexpand(True)
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+        content.set_hexpand(True)
+        content.set_vexpand(True)
         content.set_margin_top(24)
         content.set_margin_bottom(28)
         content.set_margin_start(28)
@@ -462,27 +467,91 @@ class ControlWindow(Gtk.ApplicationWindow):
         action_box.append(self.update_status)
 
         changelog_section, changelog_box = self._section(self._t('changelog_latest'))
+        changelog_section.set_vexpand(True)
+        changelog_box.set_vexpand(True)
+        changelog_frame = changelog_box.get_parent()
+        if changelog_frame is not None:
+            changelog_frame.set_vexpand(True)
         content.append(changelog_section)
-        self.changelog = Gtk.TextView()
-        self.changelog.set_editable(False)
-        self.changelog.set_cursor_visible(False)
-        self.changelog.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
-        self.changelog.set_left_margin(10)
-        self.changelog.set_right_margin(10)
-        self.changelog.set_top_margin(10)
-        self.changelog.set_bottom_margin(10)
-        self.changelog.set_size_request(-1, 230)
-        self.changelog.get_buffer().set_text(self._t('changelog_wait'))
+
+        self.changelog = Gtk.Label(xalign=0, yalign=0)
+        self.changelog.set_wrap(True)
+        self.changelog.set_hexpand(True)
+        self.changelog.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+        self.changelog.set_selectable(True)
+        self.changelog.set_use_markup(True)
+        self.changelog.set_margin_top(14)
+        self.changelog.set_margin_bottom(14)
+        self.changelog.set_margin_start(14)
+        self.changelog.set_margin_end(14)
+        self._set_changelog_markdown(self._t('changelog_wait'), markdown=False)
+
         changelog_scroll = Gtk.ScrolledWindow()
+        changelog_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         changelog_scroll.set_min_content_height(230)
+        changelog_scroll.set_hexpand(True)
+        changelog_scroll.set_vexpand(True)
         changelog_scroll.set_child(self.changelog)
         changelog_box.append(changelog_scroll)
 
-        if not self.repo:
+        if not self.repo and not self.manifest_url:
             self.check_button.set_sensitive(False)
             self.update_status.set_text(self._t('repo_unbound'))
 
         return scroll
+
+    def _markdown_inline_to_pango(self, text):
+        text = str(text or '')
+        pattern = re.compile(r'(\*\*.+?\*\*|`.+?`)')
+        parts = []
+        last = 0
+        for match in pattern.finditer(text):
+            if match.start() > last:
+                parts.append(GLib.markup_escape_text(text[last:match.start()]))
+            token = match.group(0)
+            if token.startswith('**') and token.endswith('**'):
+                inner = GLib.markup_escape_text(token[2:-2])
+                parts.append(f'<b>{inner}</b>')
+            elif token.startswith('`') and token.endswith('`'):
+                inner = GLib.markup_escape_text(token[1:-1])
+                parts.append(f'<tt>{inner}</tt>')
+            else:
+                parts.append(GLib.markup_escape_text(token))
+            last = match.end()
+        if last < len(text):
+            parts.append(GLib.markup_escape_text(text[last:]))
+        return ''.join(parts)
+
+    def _markdown_to_pango(self, text):
+        rendered = []
+        for raw in str(text or '').splitlines():
+            line = raw.rstrip()
+            stripped = line.strip()
+            if not stripped:
+                rendered.append('')
+                continue
+            if stripped.startswith('### '):
+                body = self._markdown_inline_to_pango(stripped[4:])
+                rendered.append(f'<span size="large" weight="bold">{body}</span>')
+            elif stripped.startswith('## '):
+                body = self._markdown_inline_to_pango(stripped[3:])
+                rendered.append(f'<span size="x-large" weight="bold">{body}</span>')
+            elif stripped.startswith('# '):
+                body = self._markdown_inline_to_pango(stripped[2:])
+                rendered.append(f'<span size="xx-large" weight="bold">{body}</span>')
+            elif stripped.startswith(('- ', '* ')):
+                body = self._markdown_inline_to_pango(stripped[2:])
+                rendered.append(f'• {body}')
+            else:
+                rendered.append(self._markdown_inline_to_pango(stripped))
+        return '\n'.join(rendered)
+
+    def _set_changelog_markdown(self, text, markdown=True):
+        if markdown:
+            markup = self._markdown_to_pango(text)
+        else:
+            markup = GLib.markup_escape_text(str(text or ''))
+        self.changelog.set_markup(markup)
 
     def _load_settings_into_ui(self):
         if self.settings is None:
@@ -643,9 +712,12 @@ class ControlWindow(Gtk.ApplicationWindow):
         if shell_versions and '46' not in shell_versions:
             raise RuntimeError('This update does not support GNOME Shell 46')
         filename = Path(urllib.parse.unquote(parsed.path)).name or f'zorin-shot-{latest}.zip'
+        changelog_markdown = str(manifest.get('changelog_markdown') or '').strip()
         changelog = manifest.get('changelog') or []
-        if isinstance(changelog, list):
-            body = '\n'.join(f'• {str(item).strip()}' for item in changelog if str(item).strip())
+        if changelog_markdown:
+            body = changelog_markdown
+        elif isinstance(changelog, list):
+            body = '\n'.join(f'- {str(item).strip()}' for item in changelog if str(item).strip())
         else:
             body = str(changelog).strip()
         if not body:
@@ -704,7 +776,7 @@ class ControlWindow(Gtk.ApplicationWindow):
         latest = tag.lstrip('vV') or tag
         body = str(release.get('body') or '').strip() or self._t('no_release_notes')
         self.latest_version_label.set_text(latest)
-        self.changelog.get_buffer().set_text(body)
+        self._set_changelog_markdown(body, markdown=True)
         self.release_button.set_sensitive(bool(release.get('html_url')))
         self.check_button.set_sensitive(True)
         self.progress.set_fraction(1.0)

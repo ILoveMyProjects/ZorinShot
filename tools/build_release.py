@@ -54,7 +54,7 @@ def changelog_for(version):
     text = (ROOT / 'CHANGELOG.md').read_text(encoding='utf-8')
     start = re.search(rf'^## \[{re.escape(version)}\].*$', text, re.MULTILINE)
     if not start:
-        return f'# Zorin Shot {version}\n\nBrak sekcji dla tej wersji w CHANGELOG.md.\n'
+        return f'# Zorin Shot {version}\n\nNo changelog section exists for this version.\n'
     tail = text[start.start():]
     next_heading = re.search(r'^## \[', tail[start.end() - start.start():], re.MULTILINE)
     if next_heading:
@@ -204,6 +204,7 @@ def main():
         'sha256': digest,
         'release_url': release_url,
         'changelog': changelog_items(version),
+        'changelog_markdown': changelog_for(version).strip(),
     }
 
     (out_dir / 'SHA256SUMS').write_text(f'{digest}  {zip_path.name}\n', encoding='utf-8')
